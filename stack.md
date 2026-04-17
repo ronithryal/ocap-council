@@ -10,7 +10,7 @@
     * `openai('deepseek-v3')` -> **EXECUTION_LOGIC**: High-precision reasoning for parsing PDF quotes and verifying smart contract escrow parameters.
     * `veniceAI('hermes-3')` -> **THE PRINCIPAL (Verification Layer)**: Cross-references Perplexity's findings. Validates vendor "Proofs of Work" and audits the agent's decision to release USDC.
 * **Database & Memory:** Supabase (Postgres) + **Weighted Memory Engine** (Stores vendor reputations, previous bounty results, and audit logs).
-* **Settlement Layer:** **Privy** (Embedded Wallets) + **Base L2** (USDC Escrow Contracts).
+* **Settlement Layer:** **Coinbase Embedded Wallets (CDP)** + **Base L2** (USDC Escrow Contracts).
 * **Styling:** Tailwind CSS + Shadcn UI (The "Agentic Terminal" dashboard).
 * **Privacy & TEE:** Venice.ai (API scrubbing) & NEAR AI (Confidential execution of contract release logic).
 

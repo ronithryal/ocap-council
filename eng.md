@@ -15,6 +15,9 @@
 *   Added `brockman.md` to define the "Brockman Formula" for hydration.
 *   Updated `stack.md` to link the hydration phase to the o1-prompting methodology.
 
-### 3. Infrastructure Research
-*   Evaluated Privy, Coinbase Embedded Wallets, Dynamic, and Turnkey for the settlement layer.
-*   **Pivot:** Considering **Coinbase Embedded Wallets** for Base-native scalability (pay-per-op) or **Turnkey** for autonomous agent signing.
+### 3. Infrastructure Pivot: Dropping Privy for CDP
+*   **Decision:** Replaced Privy with **Coinbase Embedded Wallets (CDP)** as the primary settlement infrastructure.
+*   **Technical Rationale:** 
+    *   **Unit Economics:** Usage-based pricing ($0.005 per signing operation) is significantly more predictable and scalable for an agentic bounty engine than Privy's MAU-based tiers.
+    *   **Ecosystem Alignment:** Native integration with Base (our target L2) and Coinbase Pay streamlines the on/off-ramp for bounty payouts.
+    *   **MPC Security:** Leveraging Coinbase's institutional MPC infrastructure rather than client-side key reconstruction.
