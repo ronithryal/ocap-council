@@ -18,12 +18,12 @@ import {
 } from 'lucide-react';
 
 const phases: { phase: AgentPhase; label: string; icon: any; color: string }[] = [
-  { phase: 'dispatching', label: 'Dispatching', icon: Clock, color: 'text-blue-400' },
-  { phase: 'navigating', label: 'Navigating', icon: Search, color: 'text-purple-400' },
-  { phase: 'vetting', label: 'Vetting', icon: ShieldCheck, color: 'text-cyan-400' },
-  { phase: 'awaiting_quote', label: 'Awaiting Quote', icon: FileText, color: 'text-orange-400' },
-  { phase: 'quote_received', label: 'Quote Received', icon: CheckCircle2, color: 'text-green-400' },
-  { phase: 'settling', label: 'Settlement', icon: CreditCard, color: 'text-blue-500' },
+  { phase: 'dispatching', label: 'Hydrating Prompt', icon: Clock, color: 'text-blue-400' },
+  { phase: 'navigating', label: 'Perplexity Web Search', icon: Search, color: 'text-purple-400' },
+  { phase: 'vetting', label: 'Credential Analysis', icon: ShieldCheck, color: 'text-cyan-400' },
+  { phase: 'awaiting_quote', label: 'Quote Generation', icon: FileText, color: 'text-orange-400' },
+  { phase: 'quote_received', label: 'Recommendation Ready', icon: CheckCircle2, color: 'text-green-400' },
+  { phase: 'settling', label: 'On-Chain Settlement', icon: CreditCard, color: 'text-blue-500' },
 ];
 
 interface AgentTrackerProps {
@@ -41,10 +41,10 @@ export function AgentTracker({ currentPhase, logs }: AgentTrackerProps) {
            <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
               <Activity className="h-4 w-4 text-blue-400 animate-pulse" />
            </div>
-           <h3 className="font-bold text-lg tracking-tight uppercase">Agent Real-time Status</h3>
+           <h3 className="font-bold text-lg tracking-tight uppercase">Perplexity Computer Agent</h3>
         </div>
         <Badge variant="outline" className="font-mono text-[10px] bg-green-500/5 text-green-400 border-green-500/20">
-          LIVE STREAM ACTIVE
+          SONAR-DEEP-RESEARCH
         </Badge>
       </div>
 

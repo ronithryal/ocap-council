@@ -21,13 +21,13 @@ export function BountyInput({ onDispatch, isLoading }: BountyInputProps) {
   const [budget, setBudget] = useState('500');
 
   const handleSubmit = () => {
-    if (!description || !address) return;
+    if (!description) return;
     onDispatch({
       title: description.split('\n')[0].substring(0, 50),
       description,
       budget: parseFloat(budget),
       category: 'Procurement',
-      userId: address,
+      userId: address || 'anon',
     });
   };
 
@@ -80,7 +80,7 @@ export function BountyInput({ onDispatch, isLoading }: BountyInputProps) {
             
             <Button 
               size="lg"
-              disabled={isLoading || !description || !address}
+              disabled={isLoading || !description}
               onClick={handleSubmit}
               className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all flex items-center gap-2 px-8"
             >
@@ -94,12 +94,6 @@ export function BountyInput({ onDispatch, isLoading }: BountyInputProps) {
               )}
             </Button>
           </div>
-          
-          {!address && (
-            <p className="text-center text-[10px] text-yellow-500/70 font-mono italic">
-              * Connect CDP Wallet to authorize agentic settlement
-            </p>
-          )}
         </div>
 
         {/* Decorative scanline effect */}

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { EscrowButton } from '@/components/wallet/EscrowButton';
 import { Vendor } from '@/types';
-import { Linkedin, Github, Globe, ExternalLink, Award, FileCheck } from 'lucide-react';
+import { Link2, Globe, ExternalLink, Award, FileCheck } from 'lucide-react';
 
 interface QuoteCardProps {
   vendor: Vendor;
@@ -46,12 +46,12 @@ export function QuoteCard({ vendor, onSettled }: QuoteCardProps) {
               <div className="flex gap-4">
                 {vendor.linkedinUrl && (
                   <a href={vendor.linkedinUrl} target="_blank" className="text-white/40 hover:text-blue-400 transition-colors">
-                    <Linkedin className="h-5 w-5" />
+                    <Link2 className="h-5 w-5" />
                   </a>
                 )}
                 {vendor.githubUrl && (
                   <a href={vendor.githubUrl} target="_blank" className="text-white/40 hover:text-white transition-colors">
-                    <Github className="h-5 w-5" />
+                    <Link2 className="h-5 w-5" />
                   </a>
                 )}
               </div>

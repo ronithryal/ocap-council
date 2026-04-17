@@ -5,6 +5,7 @@ import { useAccount, useWriteContracts } from 'wagmi';
 import { parseUnits } from 'viem';
 import { Button } from '@/components/ui/button';
 import { Transaction, TransactionButton, TransactionStatus, TransactionStatusAction, TransactionStatusLabel } from '@coinbase/onchainkit/transaction';
+import { Wallet, ConnectWallet } from '@coinbase/onchainkit/wallet';
 import { baseSepolia } from 'wagmi/chains';
 
 const USDC_ADDRESS = '0x036CbD53842c5426434e7c200b2CceBb0e8Eb8B6';
@@ -44,25 +45,34 @@ export function EscrowButton({ amount, bountyId, onSuccess }: EscrowButtonProps)
 
   return (
     <div className="flex flex-col gap-2">
-      <Transaction
-        chainId={baseSepolia.id}
-        contracts={contracts}
-        onSuccess={(response) => {
-          console.log('Transaction successful', response);
-          if (onSuccess && response.transactionReceipts[0]) {
-            onSuccess(response.transactionReceipts[0].transactionHash);
-          }
-        }}
-      >
-        <TransactionButton 
-          text="Hire & Lock Funds (Gasless)" 
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl transition-all glow-border"
-        />
-        <TransactionStatus>
-          <TransactionStatusLabel />
-          <TransactionStatusAction />
-        </TransactionStatus>
-      </Transaction>
+      {!address ? (
+        <Wallet>
+          <ConnectWallet 
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl transition-all" 
+            text="Connect Wallet to Hire" 
+          />
+        </Wallet>
+      ) : (
+        <Transaction
+          chainId={baseSepolia.id}
+          calls={contracts}
+          onSuccess={(response) => {
+            console.log('Transaction successful', response);
+            if (onSuccess && response.transactionReceipts[0]) {
+              onSuccess(response.transactionReceipts[0].transactionHash);
+            }
+          }}
+        >
+          <TransactionButton 
+            text="Hire & Lock Funds (Gasless)" 
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl transition-all glow-border"
+          />
+          <TransactionStatus>
+            <TransactionStatusLabel />
+            <TransactionStatusAction />
+          </TransactionStatus>
+        </Transaction>
+      )}
       
       <p className="text-[10px] text-muted-foreground text-center">
         Gas sponsored by OCAP Council via CDP Paymaster

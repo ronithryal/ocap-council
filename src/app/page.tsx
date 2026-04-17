@@ -1,39 +1,90 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BountyInput } from '@/components/bounty/BountyInput';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
 import { QuoteCard } from '@/components/settlement/QuoteCard';
-import { AgentPhase, BountyRequest, Vendor } from '@/types';
-import { simulateAgentWorkflow } from '@/lib/mock/agent';
+import { AgentPhase, Vendor } from '@/types';
 import { useAccount } from 'wagmi';
 
 export default function Home() {
   const { isConnected } = useAccount();
-  const [bounty, setBounty] = useState<Partial<BountyRequest> | null>(null);
   const [phase, setPhase] = useState<AgentPhase>('idle');
   const [logs, setLogs] = useState<{ message: string }[]>([]);
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [isSettled, setIsSettled] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleDispatch = (data: any) => {
-    setBounty(data);
+  const handleDispatch = async (data: any) => {
     setPhase('dispatching');
     setVendor(null);
     setIsSettled(false);
-    
-    // Simulate the full agentic loop
-    simulateAgentWorkflow(
-      'mock-id',
-      (newPhase, message) => {
-        setPhase(newPhase);
-        setLogs(prev => [...prev, { message }]);
-      },
-      (response) => {
-        setVendor(response.findings.selectedVendor as Vendor);
+    setError(null);
+    setIsLoading(true);
+    setLogs([{ message: 'OCAP Council initialized. Submitting bounty...' }]);
+
+    try {
+      // 1. Create the bounty in Supabase
+      const createRes = await fetch('/api/bounty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!createRes.ok) {
+        throw new Error('Failed to create bounty');
       }
-    );
+
+      const bounty = await createRes.json();
+
+      // 2. Update UI: navigating
+      setPhase('navigating');
+      setLogs(prev => [...prev, { message: 'Bounty created. Dispatching Perplexity Computer Agent...' }]);
+
+      // 3. Dispatch the live agent
+      const dispatchRes = await fetch(`/api/bounty/${bounty.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!dispatchRes.ok) {
+        const errData = await dispatchRes.json();
+        throw new Error(errData.error || 'Agent dispatch failed');
+      }
+
+      const result = await dispatchRes.json();
+
+      // 4. Process the result
+      setPhase('quote_received');
+      setLogs(prev => [...prev, {
+        message: `Council Recommendation ready: ${result.vendor?.name || 'Vendor found'} — $${result.vendor?.quoteAmount || '?'}`,
+      }]);
+
+      if (result.vendor) {
+        setVendor({
+          id: result.vendor.id || 'live-vendor',
+          bountyId: bounty.id,
+          name: result.vendor.name || 'Agent Result',
+          credentials: result.vendor.credentials || '',
+          quoteAmount: result.vendor.quoteAmount || 0,
+          linkedinUrl: result.vendor.linkedinUrl,
+          githubUrl: result.vendor.githubUrl,
+          websiteUrl: result.vendor.websiteUrl,
+          summary: result.vendor.summary || '',
+          isVerified: result.vendor.isVerified ?? true,
+        });
+      }
+
+    } catch (err: any) {
+      console.error('Dispatch error:', err);
+      setPhase('failed');
+      setError(err.message);
+      setLogs(prev => [...prev, { message: `ERROR: ${err.message}` }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,7 +99,7 @@ export default function Home() {
           ON-CHAIN AGENTIC PROCUREMENT
         </motion.h1>
         <p className="text-muted-foreground font-mono tracking-widest text-xs uppercase">
-          Empowering the B2B Economy with Council-Governed Agents
+          Powered by Perplexity Computer Agent · Settled on Base via CDP
         </p>
       </section>
 
@@ -57,7 +108,7 @@ export default function Home() {
         <div className="xl:col-span-12 space-y-12">
            {/* Portal View */}
            {phase === 'idle' && (
-             <BountyInput onDispatch={handleDispatch} isLoading={false} />
+             <BountyInput onDispatch={handleDispatch} isLoading={isLoading} />
            )}
         </div>
 
@@ -75,6 +126,26 @@ export default function Home() {
                     vendor={vendor} 
                     onSettled={(hash) => setIsSettled(true)} 
                    />
+                 ) : phase === 'failed' ? (
+                   <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }}
+                    className="h-full min-h-[500px] border border-red-500/20 bg-red-500/5 rounded-3xl flex flex-col items-center justify-center p-12 text-center"
+                   >
+                     <div className="h-20 w-20 rounded-full border border-red-500/20 flex items-center justify-center mb-6">
+                        <span className="text-4xl">⚠</span>
+                     </div>
+                     <h3 className="text-xl font-bold mb-2 text-red-400">Agent Dispatch Failed</h3>
+                     <p className="text-sm text-muted-foreground font-mono max-w-sm mb-6">
+                       {error || 'An unknown error occurred during the agentic workflow.'}
+                     </p>
+                     <button 
+                       onClick={() => { setPhase('idle'); setError(null); setLogs([]); }}
+                       className="px-6 py-2 bg-white/10 hover:bg-white/20 text-xs font-bold rounded-lg transition-all"
+                     >
+                       TRY AGAIN
+                     </button>
+                   </motion.div>
                  ) : (
                    <motion.div 
                     initial={{ opacity: 0 }} 
@@ -84,9 +155,9 @@ export default function Home() {
                      <div className="h-20 w-20 rounded-full border border-blue-500/20 flex items-center justify-center mb-6">
                         <div className="h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
                      </div>
-                     <h3 className="text-xl font-bold mb-2">Agent Vetting in Progress</h3>
+                     <h3 className="text-xl font-bold mb-2">Perplexity Computer Agent Active</h3>
                      <p className="text-sm text-muted-foreground font-mono max-w-sm">
-                       The OCAP Council is currently navigating vendor networks to identify the highest tier match for your requirements.
+                       The agent is autonomously navigating the web to find, vet, and recommend the best vendor for your requirements. This may take 30-60 seconds.
                      </p>
                    </motion.div>
                  )}
@@ -107,10 +178,10 @@ export default function Home() {
             <h4 className="font-bold text-green-400 uppercase tracking-tighter">Settlement Successful</h4>
           </div>
           <p className="text-xs text-white/70 font-mono mb-4">
-            USDC Locked in escrow (TX Hash: 0x8a1...3f12). Vendor notified for mobilization.
+            USDC Locked in escrow. Vendor notified for mobilization.
           </p>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => { setPhase('idle'); setVendor(null); setIsSettled(false); setLogs([]); }}
             className="w-full py-2 bg-white/10 hover:bg-white/20 text-xs font-bold rounded-lg transition-all"
           >
             DISPATCH NEW AGENT
