@@ -1,7 +1,7 @@
 # OCAP Council: B2B Bounty Engine Stack & Principles
 
 ## 1. Tech Stack (The Infrastructure)
-* **GitHub:** https://github.com/ronithryal/ocap-council [need to create]
+* **GitHub:** https://github.com/ronithryal/ocap-council
 * **Frontend/Framework:** Next.js 15 (App Router) + Vercel AI SDK (`useChat`).
 * **The "Worker" Engine:** **Perplexity Computer API**. (Handles autonomous web navigation, GUI-level vendor discovery, and outreach).
 * **Orchestration:** `streamText` with **Council-Governed Logic** in `api/chat/route.ts`. 
@@ -39,7 +39,7 @@
 
 ## 5. The Hydration Pipeline (Compiler Architecture)
 
-We strictly decouple **User Intent** from **Model Execution** to prevent sycophancy and context-drift. 
+We strictly decouple **User Intent** from **Model Execution** (following the **Brockman Formula** in `brockman.md`) to prevent sycophancy and context-drift. 
 
 ### **A. The Transformer Agent (The Pre-Processor)**
 - **Role:** Parsing and Hydrating Bounty Requirements.
