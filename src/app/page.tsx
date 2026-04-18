@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BountyInput } from '@/components/bounty/BountyInput';
+import { HydrationChat } from '@/components/bounty/HydrationChat';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
 import { QuoteCard } from '@/components/settlement/QuoteCard';
 import { AgentPhase, Vendor } from '@/types';
@@ -11,13 +12,19 @@ import { useAccount } from 'wagmi';
 export default function Home() {
   const { isConnected } = useAccount();
   const [phase, setPhase] = useState<AgentPhase>('idle');
+  const [initialPrompt, setInitialPrompt] = useState<string>('');
   const [logs, setLogs] = useState<{ message: string }[]>([]);
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [isSettled, setIsSettled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDispatch = async (data: any) => {
+  const startHydration = (data: any) => {
+    setInitialPrompt(data.description);
+    setPhase('hydrating');
+  };
+
+  const handleDispatch = async (finalPrompt: string) => {
     setPhase('dispatching');
     setVendor(null);
     setIsSettled(false);
@@ -30,7 +37,12 @@ export default function Home() {
       const createRes = await fetch('/api/bounty', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          description: finalPrompt,
+          title: finalPrompt.split('\n')[0].substring(0, 50),
+          budget: 500, // Fallback or extracted from prompt
+          category: 'Procurement',
+        }),
       });
 
       if (!createRes.ok) {
@@ -105,12 +117,20 @@ export default function Home() {
 
       {/* 2. Main Logic Flow */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-12 items-start">
-        <div className="xl:col-span-12 space-y-12">
-           {/* Portal View */}
-           {phase === 'idle' && (
-             <BountyInput onDispatch={handleDispatch} isLoading={isLoading} />
-           )}
-        </div>
+          <div className="xl:col-span-12 space-y-12">
+            {/* Portal View */}
+            {phase === 'idle' && (
+              <BountyInput onDispatch={startHydration} isLoading={isLoading} />
+            )}
+
+            {phase === 'hydrating' && (
+              <HydrationChat 
+                initialPrompt={initialPrompt} 
+                onComplete={handleDispatch}
+                onCancel={() => setPhase('idle')}
+              />
+            )}
+          </div>
 
         {phase !== 'idle' && (
           <>

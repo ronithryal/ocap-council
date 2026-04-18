@@ -5,6 +5,7 @@
 
 export type AgentPhase = 
   | 'idle' 
+  | 'hydrating'
   | 'dispatching' 
   | 'navigating' 
   | 'vetting' 

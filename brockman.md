@@ -1,22 +1,26 @@
-# The Brockman Formula: Anatomy of an o1 Prompt
+# The Brockman Formula: Agentic Perplexity Edition (2026)
 
-According to Greg Brockman (OpenAI), o1 performance is maximized by structuring prompts into four distinct sections:
+According to Greg Brockman (President, OpenAI), reasoning model performance is maximized by structuring prompts into four distinct sections. To optimize this specifically for the **Perplexity Agent API**, we integrate the official 2026 Prompt Guide heuristics.
 
-## 1. Goal
+## 1. Goal (The "Instructions")
 State exactly what you want the model to achieve and the primary constraints.
-*   *Example:* "I want a list of the best unique weekend getaways within two hours of New York City. Each destination should provide a cool and unique experience and be lesser known."
+*   **Perplexity Tip:** Separate the *Instructions* (the "How") from the *Input* (the "What"). Use the `instructions` field in the API for cross-cutting logic and the `input` field for the specific user request. 
+*   **Example:** "You are an autonomous procurement agent. Your primary goal is to identify three vendors that meet the technical requirements provided in the Context Dump."
 
-## 2. Return Format
+## 2. Return Format (The "Output Control")
 Define the precise structure, data points, and quantity of the output. 
-*   *Example:* "For each getaway, return the name of the destination as I'd find it on travel guides, then provide the starting address, the ending address (if applicable), distance, drive time, duration of the experience, and what makes it a cool and unique adventure. Return the top 3."
+*   **Perplexity Tip (Citations):** The Language Generation component cannot "see" raw URLs in real-time. **NEVER** ask the model to guess or write out a URL string. Instead, force it to use numerical citations (e.g., `[1]`) and map them to the `search_results` array.
+*   **Example:** "Return a JSON object. For the `websiteUrl` field, use the numerical citation index from your search tools (e.g., `[3]`). Do not include any text outside the JSON block."
 
-## 3. Warnings
+## 3. Warnings (The "Hallucination Guard")
 Provide specific quality guardrails, verification steps, or common pitfalls to avoid.
-*   *Example:* "Be careful to make sure that the name of the location is correct, that it actually exists, and that the time is correct."
+*   **Perplexity Tip:** Explicitly instruct the model to state "No relevant information found" rather than providing speculative or hallucinated data.
+*   **Example:** "If a LinkedIn profile cannot be found for a vendor, set that field to null. Always prioritize information from verified review platforms over personal blog claims."
 
-## 4. Context Dump (The "Separator")
+## 4. Context Dump (The "Grounding")
 Provide a long-form grounding of metadata, personal preferences, or situational background. Use a separator (like `--`) to distinguish this from the core instructions.
-*   *Example:* "For context: my partner and I love exploring! We've done pretty much all of the well-known spots in our city... [followed by personal details about past trips, current mood, and specific requirements like water views or historical sites]."
+*   **Perplexity Tip:** Use "Built-in Parameters" over "Prompt-based Control." If you want to restrict search to a specific domain (e.g., Wikipedia), use the `search_domain_filter` API parameter rather than writing it in this section.
+*   **Technical Detail:** Use `web_search_options.search_context_size: "high"` in your API call if the Context Dump contains a massive amount of technical jargon requiring deep retrieval.
 
 ---
-*Source: Greg Brockman (@gdb)*
+*Source: Greg Brockman (@gdb) x Perplexity Developer Relations*

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { dispatchPerplexityAgent, buildTaskFromBounty } from '@/lib/perplexity';
 
 /**
@@ -15,7 +15,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Fetch the bounty details
     const { data: bounty, error: fetchError } = await supabase
@@ -138,7 +140,9 @@ export async function POST(
     // Try to log the failure
     try {
       const { id } = await params;
-      const supabase = await createClient();
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
       await supabase
         .from('bounties')
         .update({ agent_phase: 'failed' })

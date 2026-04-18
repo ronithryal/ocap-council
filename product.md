@@ -25,3 +25,50 @@ An agentic engine that uses "The Principal" model (Hermes-3) to audit automated 
 *   **Target Persona:** Crypto-native protocols needing immediate auditing or vendor discovery without hiring full-time procurement teams.
 *   **Monetization Hook:** A small percentage "Audit Fee" on every bounty released through the Principal's verification layer.
 *   **Retention:** Weighted Memory Engine that tracks vendor reputation, creating a proprietary "Trust Graph" for the B2B ecosystem.
+
+---
+
+## [2026-04-17] Frictionless Onboarding & Proof of Delivery
+
+### 1. The Onboarding Funnel (UX Strategy)
+*   **The Error:** Forcing users to connect a wallet *before* letting the Perplexity Agent work was killing the demo experience. 
+*   **The Fix:** We completely decoupled the wallet from the request. Users can now type a prompt, dispatch the agent, watch it work, and view the finalized quote cards *without logging in*. The wallet is now strictly a "Checkout" (Merchant Grade) feature at the very end of the funnel.
+
+### 2. Upgrading the "Brain" for the Billion Dollar Build
+*   **Conflict:** We originally used `sonar-deep-research`. However, Perplexity's Research models are hardcoded to produce conversational, 10,000-word reports, which completely broke our rigid JSON-based B2B interface.
+*   **Solution:** We are migrating to the true **Perplexity Agent API**. By passing `web_search` as a dedicated *tool* to a generative LLM (rather than using an intrinsic search-model), we fully separate the "Research" action from the "Writing/Formatting" action. This ensures massive technical specificity without format-breaking hallucinations.
+
+### 3. Fixing the Hallucination UX
+*   **The Issue:** Generating high-quality JSON schemas containing raw URLs failed frequently. Asking the "Language Generation" part of Perplexity's system to format URLs directly caused hallucinations or schema crashes, leading to poor UX where users stared at an "Agent Dispatch Failed" retry state.
+*   **The Guide's Solution:** By rewriting the architecture to map numerical citations (e.g., `[2]`) directly to the API's backend `search_results` array, we now generate flawless JSON that contains mathematically guaranteed, non-hallucinated Github and LinkedIn URLs for verified procurement.
+
+### 4. Interactive Hydration Strategy
+*   **Approach:** Implementing a "Prompt Hydration" chat interface. Before dispatching the expensive Perplexity Agent, a cheaper "Architect" agent (Gemini 3.1 Flash) will chat with the user to fill in "Brockman Formula" gaps.
+*   **UX Hypothesis:** Chatbot-style interaction feels more premium and interactive than a static form. 
+*   **Future A/B Test:** We will eventually test **Chatbot-style (Conversational)** versus **Form-filling (Structured)** to see which yields higher "Bounty Quality" and lower "Drop-off Rate."
+
+### 5. The "Audited Settlement" Moat (2026 Strategy)
+*   **The Conflict:** Simple search engines and general marketplaces (Fiverr/Upwork) are failing due to "Trust Decay" (AI-generated garbage and fake reviews).
+*   **The Moat:** OCAP’s value is **Audited Settlement.** We don't just "find" humans; we provide an **Autonomous Procurement Ledger.** 
+    *   **Phase 1:** Agentic Vetting (Truth over Ratings).
+    *   **Phase 2:** Escrow Funding (Instant Mobilization).
+    *   **Phase 3:** Autonomous Verification (PoD Audit).
+    *   **Phase 4:** Guaranteed Release (No Chargebacks).
+
+### 6. Vertical Managed Service Providers (MSPs)
+*   **Insight:** "Managed" marketplaces like **Craftwork** (W-2 workforce, flat-rate pricing) are the highest-fidelity targets for our Agent. 
+*   **Expansion:** We are transitioning from a general "Dev-first" tool to a vertical engine that pivots its "Technical Vetting" logic based on industry-specific "Ground Truths" (e.g., searching for W-2 guarantees at Craftwork vs. Commit Logs on GitHub).
+
+### 7. Conversational Onboarding (The Chatbot Shift)
+*   **Observation:** Users often provide "thin" prompts (e.g. "I need a dev").
+*   **Solution:** Implemented the **Hydration Chat**. By using a reasoning agent to "pull" details from the user via a conversational UI, we increase the probability of high-quality agentic quote generation from the Perplexity API.
+*   **UX Value:** This positions OCAP as an "Expert Agent" rather than a simple form, increasing perceived value.
+
+### 8. The "Post-Hire" Roadmap
+To satisfy the competition's requirement for a fully autonomous company, we cannot stop at the "Hire" button. Next steps:
+> **Phase 9: Proof of Delivery (PoD)**
+> Vendors submit their work (e.g., GitHub Repo). The Perplexity Agent autonomously navigates to that repository, executes a verification sequence against the original user prompt, and approves the work.
+
+> 
+> **Phase 10: Automated Escrow Release**
+> Upon Agent approval, a webhook is fired to the Coinbase Smart Contract to autonomously release the frozen USDC to the vendor. No human auditing required.
