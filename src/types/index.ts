@@ -62,6 +62,65 @@ export interface EscrowTransaction {
 }
 
 /**
+ * V2 Forensic Engineering Types
+ */
+
+export interface ForensicCodeLibrary {
+  id: string;
+  githubUrl: string;
+  archetypeLabel: string;
+  rawDiffLogic: string;
+  // vectorEmbedding is omitted from FE types as it's typically handled server-side via pgvector
+  createdAt: string;
+}
+
+export interface EngineerReport {
+  id: string;
+  bountyId: string;
+  developerHandle: string;
+  gritScore: number;
+  redFlags: string[]; // JSON array of warnings
+  justification: string;
+  createdAt: string;
+}
+
+/**
+ * Structured output from the Forensic Scorer (Claude 3.5 Sonnet).
+ * Evaluates a developer's PR diff against the OCAP "Grit vs Slop" rubric.
+ */
+export interface ForensicScore {
+  // 0-10, overall engineering grit signal
+  gritScore: number;
+
+  // Archetype classification based on what the diff actually demonstrates
+  archetype: 'Concurrency Master' | 'State Architect' | 'Chaos Engineer' | 'Generalist' | 'Uncategorized';
+
+  // Dimensional breakdown (each 0-10)
+  dimensions: {
+    // Did they think about race conditions, null cases, timeouts, malformed input?
+    edgeCaseDensity: number;
+    // Do they manage state transitions explicitly, or let chaos leak?
+    architecturalIntent: number;
+    // Is this idiosyncratic human logic, or AI-slop boilerplate?
+    codeFingerprint: number;
+    // Did they write real tests that prove correctness (not just coverage)?
+    testingRigor: number;
+  };
+
+  // Things that PROVE grit (specific lines/patterns to reference)
+  gritMarkers: string[];
+
+  // Things that look LIKE AI-slop or carelessness
+  redFlags: string[];
+
+  // One-paragraph CTO-grade justification
+  justification: string;
+
+  // Final call: does a CTO spend $2k on this person?
+  recommendation: 'HIRE_FOR_TRIAL' | 'NEEDS_HUMAN_REVIEW' | 'DO_NOT_HIRE';
+}
+
+/**
  * Perplexity API Integration Types
  * Based on the Sonar Reasoning / Computer Agent model
  */

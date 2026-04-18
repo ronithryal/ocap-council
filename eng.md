@@ -54,4 +54,37 @@
 *   **State Management:** Built `HydrationChat.tsx` using Framer Motion to handle the conversational state machine.
 *   **Integration:** Replaced the static `BountyInput` submit with a conditional `hydrating` phase, ensuring the agent has high-fidelity instructions before hitting the Perplexity v1/agent API.
 
+---
+
+## [V2 Pivot] Execution Phase
+
+### 10. The V2 Pivot & Branching Strategy
+*   **Decision:** Shifted OCAP from generalized marketplace routing to a **Forensic Behavioral Engine** focused entirely on GitHub-native technical diligence. Read `product.md` (Section 9) or the `implementation_plan.md` artifact for the strategic rationale ("AI-slop crisis").
+*   **Action:** Initialized the `v2-forensic-engine` branch.
+*   **Next Steps:** Proceeding to refactor the Perplexity Agent payload to hunt exclusively for behavioral markers in GitHub PRs (Task 1: The "Brockman-Sourcing" Agent).
+
+---
+
+## [2026-04-18] Forensic Diligence Pipeline — E2E Working
+
+### 11. Task 3 Complete: End-to-End Diligence Verified on Real PRs
+
+Built out and debugged the full pipeline: `perplexity.ts` (Hunter) → `github.ts` (Diff Fetcher) → `forensic-scorer.ts` (Claude rubric) → `/api/bounty/[id]/diligence` route.
+
+**Bugs fixed this session:**
+*   **Claude 404:** `forensic-scorer.ts` was pinned to `claude-3-5-sonnet-20241022`, which the account 404s on. Swapped to `claude-sonnet-4-5` with `ANTHROPIC_MODEL` env override so we can rotate without a code change.
+*   **HTML-as-diff footgun:** `github.ts` had a fallback to `patch-diff.githubusercontent.com`/`github.com/.../*.diff` for 404s. Those URLs now return a 1500-line HTML 404 page that the stripper happily fed to Claude as "diff content." Killed the fallback entirely; we now rely on the authenticated REST API with `Accept: application/vnd.github.v3.diff`. Added a sanity check that throws fast if the response body doesn't start with `diff --git` or `From ` (git-format-patch header).
+*   **GitHub token:** Generated a Classic PAT scoped to `public_repo` only. Rate limit 60/hr → 5000/hr.
+
+**Calibration runs (both completed end-to-end, structured output via Claude tool-use):**
+*   `golang/go#78798` (1-word typo in a panic message) → **gritScore 1/10, DO_NOT_HIRE, "noise not signal."** Rubric correctly refuses to greenlight the $2k.
+*   `rust-lang/rust#135179` (method dispatch / vtable work in `rustc_hir_typeck`) → **gritScore 7/10, NEEDS_HUMAN_REVIEW, classified as State Architect.** Grit markers quoted specific file paths and named the autoderef/use_receiver_trait machinery.
+
+The rubric is behaving exactly as designed: skeptical by default, rewards domain-aware naming and explicit invariants, flags happy-path-only tests.
+
+### 12. Open Infra Debt (carry forward to V2 Dashboard work)
+*   6 pre-existing TS errors in `HydrationChat.tsx` and `EscrowButton.tsx` (wagmi API drift, `Message` role typing). None touch the new pipeline; park until UI rebuild.
+*   Forensic Code Library (pgvector seed set of "Gold Standard" PRs) still empty. Diligence currently scores in isolation; similarity search against the library is the next big unlock for calibration.
+*   Settlement side (Task 4 — $2k USDC escrow on Base tied to `HIRE_FOR_TRIAL`) untouched.
+
 

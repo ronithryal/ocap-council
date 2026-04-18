@@ -63,7 +63,7 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
   const handleSend = async () => {
     if (!inputValue || isAnalyzing) return;
 
-    const newMessages = [...messages, { role: 'user', content: inputValue }];
+    const newMessages: Message[] = [...messages, { role: 'user', content: inputValue }];
     setMessages(newMessages);
     setInputValue('');
     setIsAnalyzing(true);
@@ -89,7 +89,7 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
         // Final polish: let the architect finalize the Brockman prompt
         onComplete(consolidatedPrompt);
       } else {
-        setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
+        setMessages([...newMessages, { role: 'assistant' as const, content: data.reply }]);
       }
     } catch (err) {
       setError('Connection interrupted. Please try again.');

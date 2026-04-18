@@ -14,60 +14,49 @@ const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/agent';
 function hydrateBrockmanPrompt(task: PerplexityTaskRequest): string {
   return `
 ## GOAL
-You are the OCAP Council Procurement Agent. Your mission is to find, vet, and recommend the single best vendor/freelancer for the following B2B procurement request:
+You are the OCAP Council Forensic Hunter. Your mission is to find the top 1% of engineers for the following highly technical requirement:
 
 "${task.objective}"
 
-Maximum budget: $${task.maxBudget} USD.
-${task.constraints.length > 0 ? `Hard constraints: ${task.constraints.join('; ')}` : ''}
+We are NOT looking for generic developers. We are hunting for "Grit Fingerprints" on GitHub. You must utilize agentic search strategies to find behavioral markers (e.g., fixing mature race conditions, complex memory optimizations, or 'spaghetti' logic refactoring).
 
-You MUST search the live internet to find real candidates. Check LinkedIn profiles, personal websites, GitHub repositories, portfolio sites, and review platforms. Do NOT fabricate vendors.
-
-## TECHNICAL VETTING
-When evaluating the candidate, you must dive deeply into their technical history:
-- Do they have public code (GitHub/GitLab) that matches the specific stack requested (e.g., Rust, Solidity, EVM)?
-- Have they published articles, case studies, or issues solving technical problems similar to the objective (e.g., TPS benchmarking, Foundry/Hardhat stress testing)?
-- The "summary" field in your JSON MUST briefly cite the technical evidence you found (e.g., "Verified via their 'evm-bench' GitHub repo...").
+## TECHNICAL VETTING (THE ARCHETYPES)
+Your search must categorize candidates into one of these archetypes based on their raw code history:
+1. **Concurrency Masters:** (Search for PRs fixing memory leaks, race conditions, using mutexes in Rust, C++, Go).
+2. **State Architects:** (Search for PRs decoupling monolithic state into explicit, verifiable state machines).
+3. **Chaos Engineers:** (Search for PRs implementing deep edge-case handling like exponential backoffs, dead-lock prevention, or handling malformed data gracefully).
 
 ## RETURN FORMAT
 Return your findings as a strict JSON object with this exact structure. 
-For the linkedinUrl and githubUrl fields, DO NOT attempt to write the actual URL string. Instead, write the numerical citation ID referencing the source (e.g., "[1]"). We will extract the true URL from your web_search tools. Do NOT wrap the JSON in Markdown code blocks.
+For the 'smoking_gun_url', DO NOT attempt to write the actual URL string. Instead, write the numerical citation ID referencing the search result (e.g., "[1]"). We will extract the true URL. Do NOT wrap the JSON in Markdown.
 
 {
-  "selectedVendor": {
-    "name": "Full Name or Business Name",
-    "credentials": "Brief summary of relevant experience and qualifications",
-    "quoteAmount": 0,
-    "linkedinUrl": "[1]",
-    "githubUrl": "[2]",
-    "websiteUrl": "[3]",
-    "summary": "2-3 sentence explanation of why this vendor is recommended"
+  "selectedCandidate": {
+    "developer_handle": "GitHub Username",
+    "archetype_label": "Concurrency Master | State Architect | Chaos Engineer",
+    "smoking_gun_url": "[1]",
+    "summary": "Deep forensic technical justification summarizing why this specific PR proves their grit and avoids AI-slop."
   },
-  "alternativeVendors": [
+  "alternativeCandidates": [
     {
-      "name": "...",
-      "credentials": "...",
-      "quoteAmount": 0,
+      "developer_handle": "...",
+      "archetype_label": "...",
+      "smoking_gun_url": "[2]",
       "summary": "..."
     }
   ],
-  "searchSummary": "Brief description of your search methodology and confidence level"
+  "searchSummary": "Brief description of the behavioral keywords and filters used during your forensic search."
 }
 
-The "quoteAmount" should be your best estimate based on market rates, the vendor's public pricing (if available), and the budget constraint of $${task.maxBudget}.
-
 ## WARNINGS
-- Do NOT hallucinate or fabricate vendor names, URLs, or credentials.
-- If a LinkedIn/GitHub citation cannot be found, set it to null rather than guessing.
-- The quoteAmount must be a realistic number, not exactly the budget ceiling.
-- If you cannot find a strong match, return your best candidate with a clear disclaimer in the summary.
-- You must ONLY return raw JSON. Do not include any other text. Do not include conversational text or markdown code blocks like \`\`\`json.
-- You must ONLY return the JSON. Do not include any other text outside the JSON block.
+- Do NOT hallucinate GitHub URLs or developer names.
+- The 'smoking_gun_url' MUST be a link to a specific GitHub Pull Request or Commit, NOT a user profile.
+- You must ONLY return raw JSON. Do not include conversational text or markdown blocks like \`\`\`json.
+- Do NOT base recommendations on social followers or stars. Rely solely on the technical depth of their commits.
 
 ## CONTEXT
-This is an on-chain agentic procurement system. The vendor recommendation will be presented to a business user who will then lock USDC into an escrow smart contract on the Base network. Your recommendation directly triggers a financial commitment, so accuracy is paramount.
-
-Bounty ID for internal tracking: ${task.bountyId}
+This output will be fed directly into OCAP's V2 Forensic Labeler which pulls the raw .diff file of the smoking_gun_url for semantic evaluation. The atomic trial unit is a $2k USDC contract.
+Bounty ID: ${task.bountyId}
 ---
 `.trim();
 }
@@ -123,20 +112,19 @@ function parseVendorFromResponse(
     return {
       selectedVendor: {
         bountyId,
-        name: parsed.selectedVendor?.name || 'Unknown Vendor',
-        credentials: parsed.selectedVendor?.credentials || '',
-        quoteAmount: parsed.selectedVendor?.quoteAmount || 0,
-        linkedinUrl: resolveCitation(parsed.selectedVendor?.linkedinUrl),
-        githubUrl: resolveCitation(parsed.selectedVendor?.githubUrl),
-        websiteUrl: resolveCitation(parsed.selectedVendor?.websiteUrl),
-        summary: parsed.selectedVendor?.summary || '',
+        name: parsed.selectedCandidate?.developer_handle || 'Unknown Developer',
+        credentials: parsed.selectedCandidate?.archetype_label || 'Uncategorized Grit',
+        quoteAmount: 2000, // Fixed $2k Trial Contract (V2 Atomic Unit)
+        githubUrl: resolveCitation(parsed.selectedCandidate?.smoking_gun_url),
+        summary: parsed.selectedCandidate?.summary || '',
         isVerified: true,
       },
-      alternativeVendors: (parsed.alternativeVendors || []).map((v: any) => ({
+      alternativeVendors: (parsed.alternativeCandidates || []).map((v: any) => ({
         bountyId,
-        name: v.name,
-        credentials: v.credentials,
-        quoteAmount: v.quoteAmount,
+        name: v.developer_handle,
+        credentials: v.archetype_label,
+        quoteAmount: 2000, // Fixed $2k Trial Contract
+        githubUrl: resolveCitation(v.smoking_gun_url),
         summary: v.summary,
         isVerified: false,
       })),

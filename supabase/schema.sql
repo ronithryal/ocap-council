@@ -54,14 +54,41 @@ CREATE TABLE IF NOT EXISTS public.escrow_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Enable RLS
+-- 2. Extensions
+CREATE EXTENSION IF NOT EXISTS vector;
 
+-- 3. V2 Forensic Tables
+
+-- Forensic Code Library (The "Gold Standard" Feature Store)
+CREATE TABLE IF NOT EXISTS public.forensic_code_library (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    github_url TEXT NOT NULL,
+    archetype_label TEXT NOT NULL,
+    raw_diff_logic TEXT NOT NULL,
+    vector_embedding vector(1536),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Engineer Reports (CTO Diligence pipeline results)
+CREATE TABLE IF NOT EXISTS public.engineer_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bounty_id UUID NOT NULL REFERENCES public.bounties(id) ON DELETE CASCADE,
+    developer_handle TEXT NOT NULL,
+    grit_score NUMERIC,
+    red_flags JSONB DEFAULT '[]'::jsonb,
+    justification TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. Enable RLS
 ALTER TABLE public.bounties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.agent_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.escrow_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.forensic_code_library ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.engineer_reports ENABLE ROW LEVEL SECURITY;
 
--- 3. RLS Policies
+-- 5. RLS Policies
 
 -- Bounties: Users can see and manage only their own requests
 CREATE POLICY "Users can manage their own bounties" 
@@ -107,5 +134,24 @@ USING (
     )
 );
 
--- 4. Service Role (Bypass RLS for the "Council" Agent API)
+-- Forensic Code Library: Public Read (Gold Standard is visible to everyone)
+CREATE POLICY "Public read access to forensic code library"
+ON public.forensic_code_library
+FOR SELECT
+TO authenticated
+USING (true);
+
+-- Engineer Reports: Users can view reports for their own bounties
+CREATE POLICY "Users can view engineer reports for their bounties"
+ON public.engineer_reports
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.bounties
+        WHERE bounties.id = engineer_reports.bounty_id AND bounties.user_id = auth.uid()
+    )
+);
+
+-- 6. Service Role (Bypass RLS for the "Council" Agent API)
 -- By default, service_role bypasses RLS, so no dedicated policy needed.

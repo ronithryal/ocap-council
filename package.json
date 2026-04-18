@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@base-ui/react": "^1.4.0",
     "@coinbase/cdp-wagmi": "^0.0.100",
     "@coinbase/onchainkit": "^1.1.2",
