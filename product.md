@@ -72,3 +72,9 @@ To satisfy the competition's requirement for a fully autonomous company, we cann
 > 
 > **Phase 10: Automated Escrow Release**
 > Upon Agent approval, a webhook is fired to the Coinbase Smart Contract to autonomously release the frozen USDC to the vendor. No human auditing required.
+
+### 9. OCAP V2: The Forensic Engineering Pivot
+*   **The Pivot:** We are abandoning the "Yellow Pages" model (generalized routing for home services, craftwork, physical goods). Trying to compete in the "Gig" or "Lead Gen" market traps the product in low-margin, high-friction operational nightmares. Plus, the likes of Craftwork and Angi are already doing this.
+*   **The "AI-Slop" Crisis:** In 2026, the real problem CTOs face is not finding *a* developer, but finding the 1% who possess deep architectural "Grit." The market is flooded with engineers generating unvetted, generic boilerplate using LLMs (AI-slop).
+*   **The V2 Moat (Forensic Behavioral Engine):** OCAP is now a **High-Precision Talent Weapon**. We no longer match via generic keywords. We use Perplexity to hunt for specific behavioral markers on GitHub (e.g., fixing race conditions, high-complexity refactoring) and run candidates through a **Semantic Feature Store**.
+*   **Recursive Learning Loop:** We evaluate candidates' raw `.diff` files against a database of "God-Tier" code. By dynamically ingesting new high-scoring PRs when a CTO bets money on a candidate (via a $2k USDC Trial Contract), our autonomous vetting logic physically evolves, ensuring OCAP's definitions of "Good Code" constantly outpace the rise of AI-generated noise.
