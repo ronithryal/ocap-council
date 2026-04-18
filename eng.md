@@ -82,9 +82,30 @@ Built out and debugged the full pipeline: `perplexity.ts` (Hunter) → `github.t
 
 The rubric is behaving exactly as designed: skeptical by default, rewards domain-aware naming and explicit invariants, flags happy-path-only tests.
 
-### 12. Open Infra Debt (carry forward to V2 Dashboard work)
-*   6 pre-existing TS errors in `HydrationChat.tsx` and `EscrowButton.tsx` (wagmi API drift, `Message` role typing). None touch the new pipeline; park until UI rebuild.
-*   Forensic Code Library (pgvector seed set of "Gold Standard" PRs) still empty. Diligence currently scores in isolation; similarity search against the library is the next big unlock for calibration.
-*   Settlement side (Task 4 — $2k USDC escrow on Base tied to `HIRE_FOR_TRIAL`) untouched.
+### 12. V2 Cynical Dashboard — Built and Live
+
+**Problem:** The forensic pipeline had no UI to render the `ForensicScore` to CTOs.
+
+**Solution:** Built `src/components/forensic/ForensicDashboard.tsx` and `src/app/forensic-demo/page.tsx`.
+
+**What the dashboard shows:**
+- **Grit Score** (0–10) with color-coded progress bars
+- **Archetype** badge (Concurrency Master, State Architect, Chaos Engineer, Generalist, Uncategorized)
+- **Recommendation Banner** (HIRE_FOR_TRIAL / NEEDS_HUMAN_REVIEW / DO_NOT_HIRE) with color-coded icons
+- **4-Dimension Grid:** Edge Case Density, Architectural Intent, Code Fingerprint, Testing Rigor
+- **Grit Markers:** Green-coded bullet list of specific code patterns that proved engineering depth
+- **Red Flags:** Red-coded bullet list of AI-slop or carelessness indicators
+- **CTO Justification:** One-paragraph plain-language summary of why the candidate should or should not get the $2k
+- **Action Buttons:** "HIRE FOR TRIAL — $2,000 USDC" / "DO NOT HIRE" for `HIRE_FOR_TRIAL` recommendations
+
+**Demo page uses real calibration data:**
+- `golang/go#78798` → 1/10, DO_NOT_HIRE (typo in panic message)
+- `rust-lang/rust#135179` → 7/10, NEEDS_HUMAN_REVIEW (compiler dispatch / vtable work)
+
+**Routing:** Available at `/forensic-demo` — serves as the prototype shell while the full V2 product UI is built.
+
+### 13. Open Infra Debt (carry forward)
+- **Forensic Code Library (pgvector):** Still empty. Diligence currently scores in isolation. Next unlock is similarity search against ~50 seeded Gold Standard PRs.
+- **Settlement UI:** `EscrowButton.tsx` intentionally parked — OnchainKit v1.x has breaking API changes with wagmi v2 (`calls` shape, `ConnectWallet` props). Re-enable once V2 Dashboard is fully built.
 
 

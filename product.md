@@ -78,3 +78,26 @@ To satisfy the competition's requirement for a fully autonomous company, we cann
 *   **The "AI-Slop" Crisis:** In 2026, the real problem CTOs face is not finding *a* developer, but finding the 1% who possess deep architectural "Grit." The market is flooded with engineers generating unvetted, generic boilerplate using LLMs (AI-slop).
 *   **The V2 Moat (Forensic Behavioral Engine):** OCAP is now a **High-Precision Talent Weapon**. We no longer match via generic keywords. We use Perplexity to hunt for specific behavioral markers on GitHub (e.g., fixing race conditions, high-complexity refactoring) and run candidates through a **Semantic Feature Store**.
 *   **Recursive Learning Loop:** We evaluate candidates' raw `.diff` files against a database of "God-Tier" code. By dynamically ingesting new high-scoring PRs when a CTO bets money on a candidate (via a $2k USDC Trial Contract), our autonomous vetting logic physically evolves, ensuring OCAP's definitions of "Good Code" constantly outpace the rise of AI-generated noise.
+
+---
+
+## [2026-04-18] V2 Cynical Dashboard — Prototype Live
+
+### What the Dashboard Demonstrates
+The `/forensic-demo` prototype shows CTOs exactly what they get when they use OCAP instead of a recruiter or LinkedIn search:
+
+| Before (Recruiter/LinkedIn) | After (OCAP V2 Dashboard) |
+|---|---|
+| "5 years React, top rated" | 7/10 Grit Score |
+| Star ratings (easily gamed) | 4-Dimension breakdown (Edge Case Density, Architectural Intent, Code Fingerprint, Testing Rigor) |
+| Vague "references available" | Grit Markers — specific file paths + code patterns that prove depth |
+| "Great culture fit" | Red Flags — AI-slop patterns, happy-path-only tests |
+| "Let me check their LinkedIn" | CTO Justification — plain-language explanation of why to spend or skip the $2k |
+
+### Why This Wins for CTOs
+The dashboard speaks their language: code, not claims. Every metric is derived from a **raw `.diff`** file — not a profile, not a resume. A CTO can click the `smoking_gun_url` and independently audit the PR that justified the score. This is **Traceable Intelligence** — the foundation of OCAP's trust moat.
+
+### What's Next (Roadmap)
+1. **Seed the Forensic Code Library:** Ingest ~50 Gold Standard PRs from `solana-labs/solana` and `ethereum/go-ethereum` into pgvector. This enables similarity-matched scoring (not just isolated scoring) so the rubric calibrates itself over time.
+2. **Re-enable Settlement UI:** Once the V2 Dashboard is fully wired, rebuild `EscrowButton.tsx` with the correct OnchainKit v1.x API to enable the `$2,000 USDC HIRE FOR TRIAL` transaction via CDP Paymaster.
+3. **Full V2 Product UI:** Integrate the `ForensicDashboard` into the main `/` flow — after the Perplexity Hunter returns a `developerHandle` + `smokingGunUrl`, the dashboard auto-renders the report before the CTO decides to hire.
