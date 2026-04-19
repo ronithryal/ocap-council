@@ -29,8 +29,12 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     website_url TEXT,
     summary TEXT,
     is_verified BOOLEAN DEFAULT FALSE,
+    is_primary BOOLEAN NOT NULL DEFAULT TRUE,  -- FALSE for alternative candidates
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration: run this in Supabase SQL editor if the table already exists:
+-- ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Agent Logs Table (for real-time tracker)
 CREATE TABLE IF NOT EXISTS public.agent_logs (

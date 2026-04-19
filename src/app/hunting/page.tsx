@@ -19,6 +19,170 @@ interface Bounty {
   agent_phase: string;
 }
 
+// ─── NodeMap component ────────────────────────────────────────────────────────
+
+interface NodeMapProps {
+  activeBounty: Bounty | null;
+  logs: AgentLog[];
+}
+
+function extractRepoName(url: string | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/github\.com\/[^/]+\/([^/]+)/);
+  return m ? m[1] : null;
+}
+
+function NodeMap({ activeBounty, logs }: NodeMapProps) {
+  if (!activeBounty && logs.length === 0) {
+    return (
+      <div className="flex-1 relative overflow-hidden bg-[#0b0e14] flex items-center justify-center">
+        <div className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: 'linear-gradient(#00ff41 1px, transparent 1px), linear-gradient(90deg, #00ff41 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        />
+        <span className="font-mono text-[9px] text-[#3b4b37] relative z-10">NO_TARGETS_YET</span>
+      </div>
+    );
+  }
+
+  // Collect unique candidates and repos from log metadata
+  const candidates = Array.from(new Set(
+    logs.filter(l => l.metadata?.developerHandle).map(l => l.metadata.developerHandle as string)
+  ));
+  const repos = Array.from(new Set(
+    logs
+      .filter(l => l.metadata?.smokingGunUrl)
+      .map(l => extractRepoName(l.metadata.smokingGunUrl as string))
+      .filter(Boolean) as string[]
+  ));
+
+  // Fixed positions for up to 5 nodes in a 268×(flex) box
+  // BOUNTY at top-center, CANDIDATEs in middle row, REPOs at bottom
+  const W = 268;
+  const H = 220;
+  const bountyX = W / 2;
+  const bountyY = 36;
+
+  const candidateNodes = candidates.slice(0, 3).map((handle, i) => {
+    const total = Math.min(candidates.length, 3);
+    const x = (W / (total + 1)) * (i + 1);
+    return { id: `c-${i}`, label: handle, x, y: H / 2, kind: 'candidate' as const };
+  });
+
+  const repoNodes = repos.slice(0, 3).map((repo, i) => {
+    const total = Math.min(repos.length, 3);
+    const x = (W / (total + 1)) * (i + 1);
+    return { id: `r-${i}`, label: repo, x, y: H - 36, kind: 'repo' as const };
+  });
+
+  const NODE_COLORS = {
+    bounty: '#00ff41',
+    candidate: '#feb700',
+    repo: '#84967e',
+  };
+
+  return (
+    <div className="flex-1 relative overflow-hidden bg-[#0b0e14]" style={{ minHeight: 180 }}>
+      {/* Grid overlay */}
+      <div className="absolute inset-0 opacity-10"
+        style={{
+          backgroundImage: 'linear-gradient(#00ff41 1px, transparent 1px), linear-gradient(90deg, #00ff41 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      />
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{ zIndex: 1 }}
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* Lines: bounty → each candidate */}
+        {candidateNodes.map(cn => (
+          <line
+            key={`l-bc-${cn.id}`}
+            x1={bountyX} y1={bountyY}
+            x2={cn.x} y2={cn.y}
+            stroke="#00ff41"
+            strokeWidth="0.5"
+            strokeOpacity="0.3"
+            strokeDasharray="3 3"
+          />
+        ))}
+        {/* Lines: each candidate → each repo */}
+        {candidateNodes.map(cn =>
+          repoNodes.map(rn => (
+            <line
+              key={`l-cr-${cn.id}-${rn.id}`}
+              x1={cn.x} y1={cn.y}
+              x2={rn.x} y2={rn.y}
+              stroke="#feb700"
+              strokeWidth="0.5"
+              strokeOpacity="0.2"
+              strokeDasharray="2 4"
+            />
+          ))
+        )}
+      </svg>
+
+      {/* Bounty node */}
+      {activeBounty && (
+        <div
+          className="absolute z-10 flex flex-col items-center"
+          style={{ left: bountyX, top: bountyY, transform: 'translate(-50%, -50%)' }}
+        >
+          <div
+            className="border px-2 py-1 text-center"
+            style={{ borderColor: `${NODE_COLORS.bounty}50`, backgroundColor: `${NODE_COLORS.bounty}10` }}
+          >
+            <div className="font-mono text-[8px] uppercase" style={{ color: NODE_COLORS.bounty }}>BOUNTY</div>
+            <div className="font-mono text-[7px] text-[#84967e] truncate max-w-[80px]">
+              {activeBounty.title?.substring(0, 16) || activeBounty.id.substring(0, 8)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Candidate nodes */}
+      {candidateNodes.map(cn => (
+        <div
+          key={cn.id}
+          className="absolute z-10 flex flex-col items-center"
+          style={{ left: cn.x, top: cn.y, transform: 'translate(-50%, -50%)' }}
+        >
+          <div
+            className="border px-2 py-1 text-center"
+            style={{ borderColor: `${NODE_COLORS.candidate}40`, backgroundColor: `${NODE_COLORS.candidate}10` }}
+          >
+            <div className="font-mono text-[8px] uppercase" style={{ color: NODE_COLORS.candidate }}>CANDIDATE</div>
+            <div className="font-mono text-[7px] text-[#84967e] truncate max-w-[72px]">{cn.label}</div>
+          </div>
+        </div>
+      ))}
+
+      {/* Repo nodes */}
+      {repoNodes.map(rn => (
+        <div
+          key={rn.id}
+          className="absolute z-10 flex flex-col items-center"
+          style={{ left: rn.x, top: rn.y, transform: 'translate(-50%, -50%)' }}
+        >
+          <div
+            className="border px-2 py-1 text-center"
+            style={{ borderColor: `${NODE_COLORS.repo}40`, backgroundColor: `${NODE_COLORS.repo}10` }}
+          >
+            <div className="font-mono text-[8px] uppercase" style={{ color: NODE_COLORS.repo }}>REPO</div>
+            <div className="font-mono text-[7px] text-[#84967e] truncate max-w-[72px]">{rn.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const PHASE_TAG: Record<string, { label: string; color: string }> = {
   dispatching:    { label: 'INFO',         color: '#84967e' },
   navigating:     { label: 'INFO',         color: '#84967e' },
@@ -245,41 +409,10 @@ export default function HuntingPage() {
             <div className="px-4 py-3 border-b border-[#1a1f26]/40">
               <span className="font-['Space_Grotesk'] text-[10px] uppercase tracking-widest text-[#84967e]">ACTIVE TARGETS</span>
             </div>
-            <div className="flex-1 relative overflow-hidden bg-[#0b0e14]">
-              {/* Grid overlay */}
-              <div className="absolute inset-0 opacity-10"
-                style={{
-                  backgroundImage: 'linear-gradient(#00ff41 1px, transparent 1px), linear-gradient(90deg, #00ff41 1px, transparent 1px)',
-                  backgroundSize: '24px 24px'
-                }}
-              />
-              {/* Nodes from logs */}
-              {logs.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="font-mono text-[9px] text-[#3b4b37]">NO_TARGETS_YET</span>
-                </div>
-              ) : (
-                <div className="absolute inset-0 p-4 flex flex-col gap-2 overflow-y-auto">
-                  {bounties.filter(b => b.id === activeBountyId).map(b => (
-                    <div key={b.id} className="border border-[#00ff41]/30 bg-[#00ff41]/5 p-2">
-                      <div className="font-mono text-[9px] text-[#00ff41] truncate">{b.title?.substring(0, 30) || b.id.substring(0, 8)}</div>
-                      <div className="font-mono text-[8px] text-[#84967e] mt-0.5">{b.agent_phase?.toUpperCase()}</div>
-                    </div>
-                  ))}
-                  {/* Show unique developer handles from logs */}
-                  {Array.from(new Set(
-                    logs
-                      .filter(l => l.metadata?.developerHandle)
-                      .map(l => l.metadata.developerHandle as string)
-                  )).map(handle => (
-                    <div key={handle} className="border border-[#feb700]/20 bg-[#feb700]/5 p-2">
-                      <div className="font-mono text-[9px] text-[#feb700] truncate">{handle}</div>
-                      <div className="font-mono text-[8px] text-[#84967e] mt-0.5">CANDIDATE</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <NodeMap
+            activeBounty={bounties.find(b => b.id === activeBountyId) ?? null}
+            logs={logs}
+          />
           </div>
 
           {/* Source Breakdown */}

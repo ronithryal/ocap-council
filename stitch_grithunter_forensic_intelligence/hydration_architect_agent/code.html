@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Architect Agent - Hydration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-container": "#6b4b00",
+                    "tertiary-fixed": "#ffdcbd",
+                    "primary-container": "#00ff41",
+                    "surface-container-highest": "#32353c",
+                    "background": "#10131a",
+                    "inverse-primary": "#006e16",
+                    "surface-container": "#1d2026",
+                    "on-background": "#e1e2eb",
+                    "secondary-fixed": "#ffdea8",
+                    "secondary-fixed-dim": "#ffba20",
+                    "surface-container-low": "#191c22",
+                    "error-container": "#93000a",
+                    "surface-variant": "#32353c",
+                    "surface-bright": "#363940",
+                    "inverse-surface": "#e1e2eb",
+                    "on-surface": "#e1e2eb",
+                    "on-error": "#690005",
+                    "on-surface-variant": "#b9ccb2",
+                    "secondary": "#ffdb9d",
+                    "on-error-container": "#ffdad6",
+                    "surface-dim": "#10131a",
+                    "outline": "#84967e",
+                    "error": "#ffb4ab",
+                    "secondary-container": "#feb700",
+                    "on-tertiary": "#442b10",
+                    "on-tertiary-fixed-variant": "#5d4124",
+                    "on-primary": "#003907",
+                    "surface-tint": "#00e639",
+                    "tertiary-container": "#ffd5ae",
+                    "outline-variant": "#3b4b37",
+                    "on-primary-fixed": "#002203",
+                    "on-primary-fixed-variant": "#00530e",
+                    "inverse-on-surface": "#2e3037",
+                    "primary": "#ebffe2",
+                    "on-tertiary-fixed": "#2c1701",
+                    "on-secondary": "#412d00",
+                    "surface-container-lowest": "#0b0e14",
+                    "surface": "#10131a",
+                    "tertiary-fixed-dim": "#e7bf99",
+                    "on-primary-container": "#007117",
+                    "tertiary": "#fff8f4",
+                    "on-tertiary-container": "#7a5b3c",
+                    "on-secondary-fixed-variant": "#5e4200",
+                    "surface-container-high": "#272a31",
+                    "on-secondary-fixed": "#271900",
+                    "primary-fixed-dim": "#00e639",
+                    "primary-fixed": "#72ff70"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px",
+                    "none": "0px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": [
+                            "Space Grotesk"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "label": [
+                            "Space Grotesk"
+                    ],
+                    "mono": [
+                            "JetBrains Mono"
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      body {
+        background-color: #0b0e14;
+        color: #e1e2eb;
+        font-family: 'Inter', sans-serif;
+      }
+      .font-space { font-family: 'Space Grotesk', sans-serif; }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      
+      /* Surgical Hover Logic */
+      .surgical-row:hover {
+        background-color: rgba(0, 255, 65, 0.05);
+      }
+      .surgical-row:hover .surgical-trace {
+        opacity: 1;
+      }
+      
+      /* Terminal Scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #10131a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3b4b37; 
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #00ff41; 
+      }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden bg-surface-container-lowest">
+<!-- TopNavBar -->
+<nav class="flex items-center justify-between w-full h-12 px-6 sticky top-0 z-50 ml-20 md:ml-64 bg-[#0b0e14]/90 backdrop-blur-md border-b border-[#1a1f26]">
+<div class="flex items-center space-x-4">
+<span class="font-['Space_Grotesk'] font-bold text-[#00FF41]">CONSOLE_ALPHA</span>
+<div class="h-4 w-px bg-surface-container-high mx-2"></div>
+<div class="flex space-x-6">
+<a class="font-['JetBrains_Mono'] text-[11px] text-[#00FF41] font-bold underline decoration-[#00FF41] underline-offset-4 flex items-center" href="#">
+<span class="w-1.5 h-1.5 rounded-none bg-[#00FF41] mr-2"></span>
+                    Hydration
+                </a>
+<a class="font-['JetBrains_Mono'] text-[11px] text-slate-500 hover:text-[#00FF41] transition-colors duration-100" href="#">Interrogation</a>
+<a class="font-['JetBrains_Mono'] text-[11px] text-slate-500 hover:text-[#00FF41] transition-colors duration-100" href="#">Extraction</a>
+</div>
+</div>
+<div class="flex items-center space-x-4">
+<div class="flex items-center bg-surface-container-low border border-outline-variant px-3 py-1.5 rounded-none w-64">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant mr-2">search</span>
+<input class="bg-transparent border-none outline-none text-xs font-mono text-on-surface w-full placeholder-on-surface-variant/50 focus:ring-0 p-0" placeholder="QUERY_LOGS..." type="text"/>
+</div>
+<div class="flex space-x-3 text-slate-500">
+<button class="hover:text-[#00FF41] transition-colors"><span class="material-symbols-outlined text-[18px]">security</span></button>
+<button class="hover:text-[#00FF41] transition-colors"><span class="material-symbols-outlined text-[18px]">monitoring</span></button>
+<button class="hover:text-[#00FF41] transition-colors"><span class="material-symbols-outlined text-[18px]">account_tree</span></button>
+</div>
+<button class="bg-[#00FF41] text-[#003907] px-4 py-1.5 font-mono text-[11px] font-bold rounded-none hover:bg-opacity-90 active:opacity-50 transition-all border border-transparent hover:shadow-[inset_0_0_0_1px_#ebffe2]">
+                DECODE_DIFF
+            </button>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="h-screen flex flex-col fixed left-0 top-0 z-40 bg-[#0b0e14] rounded-none border-r border-[#1a1f26] w-20 md:w-64">
+<div class="p-6 flex flex-col items-start border-b border-[#1a1f26] mb-4 bg-[#10131a]">
+<img alt="CTO Profile" class="w-10 h-10 object-cover mb-3 grayscale opacity-80" data-alt="CTO Profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfrXvpVUgCVMsgIsvulByL99GCqSqzmSt9DlhEisHcwYVSpSYpW_FCC9GfTAZ2SjB_mRiu4s1WOVWQP6WW4MrLT0PH3h397ehdotNszh5HVZKaPNfWtZ7UWvyiP1vhDcWBWbt6IGXBpHdqQSper0wk_RMixoY4mMT40oz0_tHXH_a5mtzh87LibP3AeAMcJlDntlpPk5OgjmlCv07VvIcDRfizTHxYLvpm9n_ZSnzPVf633KP057OCkIGHr553YX1FefTNPvysEWtj"/>
+<h1 class="font-['Space_Grotesk'] font-black text-[#00FF41] tracking-tighter text-xl hidden md:block">FORENSIC_OS</h1>
+<span class="font-mono text-[9px] text-slate-500 hidden md:block">V2.4.0_STABLE</span>
+</div>
+<div class="flex-1 overflow-y-auto w-full">
+<nav class="flex flex-col space-y-1 w-full">
+<!-- Active Tab -->
+<a class="flex items-center px-6 py-3 w-full text-[#00FF41] bg-[#00FF41]/5 border-l-2 border-[#00FF41] hover:bg-[#1a1f26] transition-colors duration-100 group" href="#">
+<span class="material-symbols-outlined text-[18px] mr-4 group-hover:drop-shadow-[0_0_4px_rgba(0,255,65,0.5)]">smart_toy</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Architect</span>
+</a>
+<a class="flex items-center px-6 py-3 w-full text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 group border-l-2 border-transparent" href="#">
+<span class="material-symbols-outlined text-[18px] mr-4">radar</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Hunting</span>
+</a>
+<a class="flex items-center px-6 py-3 w-full text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 group border-l-2 border-transparent" href="#">
+<span class="material-symbols-outlined text-[18px] mr-4">biotech</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Audit</span>
+</a>
+<a class="flex items-center px-6 py-3 w-full text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 group border-l-2 border-transparent" href="#">
+<span class="material-symbols-outlined text-[18px] mr-4">description</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Diligence</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto border-t border-[#1a1f26] bg-[#10131a] w-full">
+<div class="px-6 py-4 w-full flex flex-col space-y-2">
+<a class="flex items-center w-full text-slate-500 hover:text-[#00FF41] transition-colors py-1 group" href="#">
+<span class="material-symbols-outlined text-[16px] mr-4">terminal</span>
+<span class="font-mono text-[10px] hidden md:block">Terminal</span>
+</a>
+<a class="flex items-center w-full text-slate-500 hover:text-[#00FF41] transition-colors py-1 group" href="#">
+<span class="material-symbols-outlined text-[16px] mr-4">list_alt</span>
+<span class="font-mono text-[10px] hidden md:block">Logs</span>
+</a>
+</div>
+<div class="p-4 w-full">
+<button class="w-full bg-surface-container-high border border-outline-variant text-on-surface hover:text-[#00FF41] hover:border-[#00FF41] px-4 py-2 font-mono text-[11px] font-bold rounded-none transition-all hidden md:flex justify-center items-center">
+<span class="material-symbols-outlined text-[14px] mr-2">play_arrow</span>
+                    INIT_SCAN
+                </button>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex overflow-hidden ml-20 md:ml-64 relative bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-primary-container/5 via-surface-container-lowest to-surface-container-lowest">
+<!-- Left Column: Context & History -->
+<section class="w-1/4 min-w-[280px] bg-surface-dim border-r border-surface-variant flex flex-col hidden lg:flex">
+<!-- Header -->
+<div class="p-4 border-b border-surface-variant bg-surface-container-low flex items-center justify-between">
+<div>
+<h2 class="font-space text-sm font-bold text-on-surface uppercase tracking-wide">Architect Agent</h2>
+<div class="flex items-center mt-1">
+<span class="w-2 h-2 rounded-full bg-primary-container mr-2 animate-pulse"></span>
+<span class="font-mono text-[10px] text-primary-container">STATUS: ACTIVE</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline">memory</span>
+</div>
+<!-- History List -->
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<div class="space-y-1">
+<h3 class="font-mono text-[10px] text-outline uppercase mb-2">Session Map</h3>
+<div class="p-3 bg-surface-container border border-outline-variant rounded-none hover:bg-surface-container-high cursor-pointer group">
+<div class="flex justify-between items-start mb-1">
+<span class="font-space text-xs font-semibold text-on-surface">Data Pipeline Req</span>
+<span class="font-mono text-[9px] text-outline">10:42 AM</span>
+</div>
+<p class="font-mono text-[10px] text-on-surface-variant truncate">Define Kafka to S3 ingestion...</p>
+<div class="flex mt-2 space-x-1">
+<span class="px-1.5 py-0.5 bg-primary-container/10 text-primary-container font-mono text-[8px]">COMPLETE</span>
+</div>
+</div>
+<div class="p-3 bg-surface-container-low border border-primary-container/30 rounded-none relative group">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-primary-container"></div>
+<div class="flex justify-between items-start mb-1 pl-2">
+<span class="font-space text-xs font-semibold text-primary">Distributed State</span>
+<span class="font-mono text-[9px] text-primary-container animate-pulse">ACTIVE</span>
+</div>
+<p class="font-mono text-[10px] text-on-surface-variant truncate pl-2">Raft vs Paxos evaluation...</p>
+</div>
+</div>
+</div>
+<!-- Context Window -->
+<div class="p-4 bg-surface-container-low border-t border-surface-variant">
+<div class="flex justify-between items-center mb-2">
+<span class="font-mono text-[10px] text-outline uppercase">Context Depth</span>
+<span class="font-mono text-[10px] text-primary-container">84%</span>
+</div>
+<div class="w-full h-1 bg-surface-variant rounded-none overflow-hidden">
+<div class="h-full bg-primary-container w-[84%]"></div>
+</div>
+</div>
+</section>
+<!-- Center Column: Terminal Interface -->
+<section class="flex-1 flex flex-col bg-surface-container-lowest relative z-10">
+<!-- Terminal Output Area -->
+<div class="flex-1 overflow-y-auto p-6 font-mono text-sm space-y-6">
+<!-- System Init -->
+<div class="text-outline text-xs mb-8 border-b border-surface-variant pb-2">
+<p>&gt; INITIATING_SESSION_ID: a7b9-4f22-88cd</p>
+<p>&gt; ARCHITECT_MODEL: HYDRA-7B-INSTRUCT</p>
+<p>&gt; LOAD_PARAMS: STRICT_CONSISTENCY=TRUE, LATENCY_BUDGET=LOW</p>
+<p>&gt; AWAITING_INPUT...</p>
+</div>
+<!-- User Message -->
+<div class="flex flex-col items-end w-full pl-12">
+<div class="bg-surface-container p-4 border border-outline-variant max-w-3xl w-full">
+<div class="flex justify-between items-center mb-2 border-b border-surface-variant pb-2">
+<span class="text-[10px] text-on-surface-variant">CTO_USER [AUTHORITY: HIGH]</span>
+<span class="text-[10px] text-outline">11:05:22 UTC</span>
+</div>
+<p class="text-on-surface leading-relaxed whitespace-pre-wrap">I need to define the architecture for a new distributed state machine. It will handle financial transaction ledgers across 3 regions (US-East, EU-Central, AP-South). 
+                        
+Requirements:
+- High write throughput (10k ops/sec)
+- Tolerance for single-region partition
+- Read-heavy workloads on the perimeter</p>
+</div>
+</div>
+<!-- Agent Message -->
+<div class="flex flex-col items-start w-full pr-12">
+<div class="bg-surface-container-low p-4 border border-primary-container/20 max-w-3xl w-full relative">
+<!-- Technical Trace -->
+<div class="absolute left-[-16px] top-4 bottom-4 w-px bg-primary-container/30"></div>
+<div class="flex justify-between items-center mb-3 border-b border-surface-variant pb-2">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-[14px] text-primary-container mr-2">memory</span>
+<span class="text-[10px] text-primary-container font-bold">ARCHITECT_AGENT</span>
+</div>
+<span class="text-[10px] text-outline">11:05:24 UTC</span>
+</div>
+<div class="text-on-surface leading-relaxed space-y-4">
+<p>Analyzing requirements for financial ledger state machine. 3 regions, 10k ops/sec, partition tolerance required.</p>
+<div class="bg-surface-container-highest p-3 border border-outline-variant">
+<span class="text-[10px] text-secondary-fixed-dim uppercase mb-1 block">Conflict Detected:</span>
+<p class="text-xs text-on-surface-variant">"High write throughput" vs "Financial ledger (implies Strong Consistency)" across WAN.</p>
+</div>
+<p>To finalize the architectural blueprint, I must clarify your consistency model constraints. Please address the following:</p>
+<ul class="space-y-3 mt-4">
+<li class="flex items-start">
+<span class="text-primary-container mr-2">&gt;</span>
+<div>
+<span class="text-primary block">C1. Cross-Region Latency Budget</span>
+<span class="text-xs text-on-surface-variant">Can writes tolerate cross-ocean RTT (approx 150-200ms) to achieve consensus (e.g., Multi-Region Raft), or do you require local commits with asynchronous replication?</span>
+</div>
+</li>
+<li class="flex items-start">
+<span class="text-primary-container mr-2">&gt;</span>
+<div>
+<span class="text-primary block">C2. Consistency vs Availability (CAP)</span>
+<span class="text-xs text-on-surface-variant">During a US-East partition, should the system reject writes globally to maintain serializability, or accept writes in active regions and handle reconciliation later?</span>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Typing Indicator -->
+<div class="flex items-center text-primary-container text-xs animate-pulse opacity-70">
+<span>&gt;</span><span class="ml-2 bg-primary-container w-2 h-4 block"></span>
+</div>
+</div>
+<!-- Command Line Input -->
+<div class="p-4 bg-surface border-t border-surface-variant">
+<div class="relative bg-surface-container-low border border-outline-variant p-1 focus-within:border-primary-container transition-colors">
+<div class="flex items-start p-2">
+<span class="font-mono text-primary-container mt-1 mr-2">&gt;</span>
+<textarea class="w-full bg-transparent border-none outline-none font-mono text-sm text-on-surface placeholder-outline resize-none focus:ring-0" placeholder="Define constraints or paste architectural specifications..." rows="3"></textarea>
+</div>
+<div class="flex justify-between items-center p-2 border-t border-surface-variant mt-1">
+<div class="flex space-x-2">
+<button class="px-2 py-1 text-[10px] font-mono text-outline hover:text-on-surface bg-surface-variant border border-transparent hover:border-outline-variant transition-colors">/upload_spec</button>
+<button class="px-2 py-1 text-[10px] font-mono text-outline hover:text-on-surface bg-surface-variant border border-transparent hover:border-outline-variant transition-colors">/diagram</button>
+</div>
+<button class="bg-primary-container text-on-primary px-4 py-1.5 font-mono text-xs font-bold rounded-none hover:bg-opacity-90 active:opacity-50 transition-all shadow-[0_0_10px_rgba(0,255,65,0.2)] flex items-center">
+                            EXECUTE <span class="material-symbols-outlined text-[14px] ml-1">keyboard_return</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Column: Generation Metircs -->
+<section class="w-1/4 min-w-[300px] bg-surface-container border-l border-surface-variant p-6 flex flex-col overflow-y-auto hidden xl:flex">
+<h2 class="font-space text-lg font-bold text-on-surface mb-6 uppercase tracking-tight">Prompt Telemetry</h2>
+<!-- Generation Progress -->
+<div class="mb-8">
+<div class="flex justify-between items-end mb-2">
+<span class="font-mono text-xs text-outline uppercase">Final Prompt Build</span>
+<span class="font-mono text-lg text-primary-container font-bold">42%</span>
+</div>
+<div class="w-full h-2 bg-surface-variant rounded-none relative overflow-hidden">
+<!-- Scanline effect -->
+<div class="absolute top-0 left-0 bottom-0 bg-primary-container w-[42%] relative overflow-hidden">
+<div class="absolute top-0 bottom-0 w-4 bg-white/30 skew-x-[-20deg] animate-[ping_2s_infinite]"></div>
+</div>
+</div>
+<p class="font-mono text-[9px] text-outline mt-2 text-right">EST_COMPLETION: 2_ITERATIONS</p>
+</div>
+<!-- Readiness Metrics -->
+<div class="space-y-4 mb-8">
+<h3 class="font-mono text-[10px] text-on-surface-variant uppercase border-b border-surface-variant pb-1">Hunting Readiness Vectors</h3>
+<div class="flex justify-between items-center group">
+<span class="font-mono text-xs text-on-surface group-hover:text-primary-container transition-colors">Clarity Score</span>
+<div class="flex items-center">
+<span class="font-mono text-xs text-secondary-fixed-dim mr-2">0.65</span>
+<div class="w-16 h-1 bg-surface-variant"><div class="h-full bg-secondary-fixed-dim w-[65%]"></div></div>
+</div>
+</div>
+<div class="flex justify-between items-center group">
+<span class="font-mono text-xs text-on-surface group-hover:text-primary-container transition-colors">Constraint Density</span>
+<div class="flex items-center">
+<span class="font-mono text-xs text-primary-container mr-2">0.92</span>
+<div class="w-16 h-1 bg-surface-variant"><div class="h-full bg-primary-container w-[92%]"></div></div>
+</div>
+</div>
+<div class="flex justify-between items-center group">
+<span class="font-mono text-xs text-on-surface group-hover:text-primary-container transition-colors">Ambiguity Index</span>
+<div class="flex items-center">
+<span class="font-mono text-xs text-error mr-2">0.31</span>
+<div class="w-16 h-1 bg-surface-variant"><div class="h-full bg-error w-[31%]"></div></div>
+</div>
+</div>
+</div>
+<!-- Extracted Parameters (Bento Style) -->
+<h3 class="font-mono text-[10px] text-on-surface-variant uppercase border-b border-surface-variant pb-1 mb-3">Extracted Parameters</h3>
+<div class="grid grid-cols-2 gap-2 mb-6">
+<div class="bg-surface p-3 border border-outline-variant flex flex-col justify-between h-20">
+<span class="font-mono text-[9px] text-outline">TOPOLOGY</span>
+<span class="font-space text-sm font-bold text-on-surface">3-Region WAN</span>
+</div>
+<div class="bg-surface p-3 border border-outline-variant flex flex-col justify-between h-20">
+<span class="font-mono text-[9px] text-outline">THROUGHPUT</span>
+<span class="font-space text-sm font-bold text-on-surface">10K<span class="text-xs text-outline ml-1">ops/s</span></span>
+</div>
+<div class="bg-surface p-3 border border-primary-container/30 flex flex-col justify-between h-20 col-span-2 relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>
+<span class="font-mono text-[9px] text-outline pl-2">DOMAIN</span>
+<span class="font-space text-sm font-bold text-primary-container pl-2">Financial Ledger</span>
+</div>
+</div>
+<!-- Target Output Schema -->
+<div class="mt-auto bg-surface border border-outline-variant p-4">
+<div class="flex items-center justify-between mb-3">
+<span class="font-mono text-[10px] text-on-surface-variant uppercase">Target Artifact</span>
+<span class="material-symbols-outlined text-[14px] text-outline">code</span>
+</div>
+<div class="font-mono text-[10px] text-outline leading-tight">
+<span class="text-secondary-fixed-dim">type</span> HuntingPrompt = {<br/>
+                      role: <span class="text-primary-container">"System Architect"</span>,<br/>
+                      task: <span class="text-primary-container">"State Machine Design"</span>,<br/>
+                      constraints: Array&lt;Condition&gt;,<br/>
+                      evaluation_matrix: Metrics<br/>
+                    }
+                </div>
+</div>
+</section>
+<!-- Ambient Glow Effects -->
+<div class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary-container/5 blur-[120px] rounded-full z-0"></div>
+</main>
+</body></html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hunting - Live Radar | FORENSIC_OS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#6b4b00",
+                        "tertiary-fixed": "#ffdcbd",
+                        "primary-container": "#00ff41",
+                        "surface-container-highest": "#32353c",
+                        "background": "#10131a",
+                        "inverse-primary": "#006e16",
+                        "surface-container": "#1d2026",
+                        "on-background": "#e1e2eb",
+                        "secondary-fixed": "#ffdea8",
+                        "secondary-fixed-dim": "#ffba20",
+                        "surface-container-low": "#191c22",
+                        "error-container": "#93000a",
+                        "surface-variant": "#32353c",
+                        "surface-bright": "#363940",
+                        "inverse-surface": "#e1e2eb",
+                        "on-surface": "#e1e2eb",
+                        "on-error": "#690005",
+                        "on-surface-variant": "#b9ccb2",
+                        "secondary": "#ffdb9d",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#10131a",
+                        "outline": "#84967e",
+                        "error": "#ffb4ab",
+                        "secondary-container": "#feb700",
+                        "on-tertiary": "#442b10",
+                        "on-tertiary-fixed-variant": "#5d4124",
+                        "on-primary": "#003907",
+                        "surface-tint": "#00e639",
+                        "tertiary-container": "#ffd5ae",
+                        "outline-variant": "#3b4b37",
+                        "on-primary-fixed": "#002203",
+                        "on-primary-fixed-variant": "#00530e",
+                        "inverse-on-surface": "#2e3037",
+                        "primary": "#ebffe2",
+                        "on-tertiary-fixed": "#2c1701",
+                        "on-secondary": "#412d00",
+                        "surface-container-lowest": "#0b0e14",
+                        "surface": "#10131a",
+                        "tertiary-fixed-dim": "#e7bf99",
+                        "on-primary-container": "#007117",
+                        "tertiary": "#fff8f4",
+                        "on-tertiary-container": "#7a5b3c",
+                        "on-secondary-fixed-variant": "#5e4200",
+                        "surface-container-high": "#272a31",
+                        "on-secondary-fixed": "#271900",
+                        "primary-fixed-dim": "#00e639",
+                        "primary-fixed": "#72ff70"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "0px"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Space Grotesk", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #10131a; color: #e1e2eb; }
+        .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        .font-label { font-family: 'Space Grotesk', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Surgical Accents & Overrides */
+        .glass-panel { background: rgba(39, 42, 49, 0.4); backdrop-filter: blur(12px); }
+        .glow-sm { box-shadow: 0 0 8px rgba(0, 255, 65, 0.3); }
+        .glow-md { box-shadow: 0 0 16px rgba(0, 255, 65, 0.2); }
+        .ghost-border { border: 1px solid rgba(132, 150, 126, 0.2); }
+        
+        /* Scan Line Animation (CSS only for visual context, disabled per rules but structured for intent) */
+        .scan-line-container { position: relative; overflow: hidden; }
+        .scan-line { position: absolute; left: 0; width: 100%; height: 2px; background-color: #00FF41; opacity: 0.5; box-shadow: 0 0 8px #00FF41; top: 50%; }
+        
+        /* Hover Trace */
+        .hover-trace:hover::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #72ff70;
+            box-shadow: 0 0 4px #72ff70;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0b0e14; }
+        ::-webkit-scrollbar-thumb { background: #3b4b37; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff41; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased overflow-hidden flex h-screen">
+<!-- SideNavBar -->
+<nav class="h-screen flex flex-col fixed left-0 top-0 z-40 bg-[#0b0e14] rounded-none border-r border-[#1a1f26] w-20 md:w-64">
+<!-- Header -->
+<div class="p-6 border-b border-surface-container-high/30 flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-container-high rounded-none flex items-center justify-center ghost-border shrink-0">
+<span class="material-symbols-outlined text-primary" data-icon="terminal">terminal</span>
+</div>
+<div class="hidden md:block overflow-hidden">
+<h1 class="font-['Space_Grotesk'] font-black text-[#00FF41] tracking-tighter text-xl truncate">FORENSIC_OS</h1>
+<p class="font-mono text-[10px] text-on-surface-variant">V2.4.0_STABLE</p>
+</div>
+</div>
+<!-- Main Tabs -->
+<div class="flex-1 overflow-y-auto py-6 flex flex-col gap-2 px-2">
+<!-- Inactive -->
+<a class="flex items-center gap-4 px-4 py-3 text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 group relative" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Architect</span>
+</a>
+<!-- Active: Hunting -->
+<a class="flex items-center gap-4 px-4 py-3 text-[#00FF41] bg-[#00FF41]/5 border-l-2 border-[#00FF41] group relative hover-trace" href="#">
+<span class="material-symbols-outlined" data-icon="radar" data-weight="fill" style="font-variation-settings: 'FILL' 1;">radar</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block font-bold">Hunting</span>
+</a>
+<!-- Inactive -->
+<a class="flex items-center gap-4 px-4 py-3 text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 group relative" href="#">
+<span class="material-symbols-outlined" data-icon="biotech">biotech</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Audit</span>
+</a>
+<!-- Inactive -->
+<a class="flex items-center gap-4 px-4 py-3 text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 group relative" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-xs uppercase hidden md:block">Diligence</span>
+</a>
+</div>
+<!-- Footer Tabs -->
+<div class="mt-auto border-t border-surface-container-high/30 py-4 flex flex-col gap-2 px-2">
+<a class="flex items-center gap-4 px-4 py-2 text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="terminal">terminal</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-[10px] uppercase hidden md:block">Terminal</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-2 text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="list_alt">list_alt</span>
+<span class="font-['Space_Grotesk'] tracking-tight text-[10px] uppercase hidden md:block">Logs</span>
+</a>
+<!-- CTA -->
+<div class="px-4 mt-4 hidden md:block">
+<button class="w-full bg-primary-container text-on-primary font-label text-xs py-3 uppercase hover:opacity-90 transition-opacity flex items-center justify-center gap-2 border-none">
+<span class="material-symbols-outlined text-[16px]" data-icon="play_arrow">play_arrow</span>
+                    INIT_SCAN
+                </button>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<div class="flex-1 flex flex-col ml-20 md:ml-64 h-screen bg-surface-container-lowest">
+<!-- TopNavBar -->
+<header class="flex items-center justify-between w-full h-12 px-6 sticky top-0 z-50 bg-[#0b0e14]/90 backdrop-blur-md rounded-none border-b border-[#1a1f26] shadow-none">
+<div class="flex items-center gap-4">
+<span class="font-['Space_Grotesk'] font-bold text-[#00FF41]">CONSOLE_ALPHA</span>
+<div class="h-4 w-px bg-surface-variant mx-2"></div>
+<span class="font-mono text-xs text-on-surface-variant">NODE_09_ACTIVE</span>
+</div>
+<div class="flex items-center gap-6">
+<!-- Trailing Icon Actions -->
+<div class="flex items-center gap-3">
+<button class="text-slate-500 hover:text-[#00FF41] transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="security">security</span>
+</button>
+<button class="text-slate-500 hover:text-[#00FF41] transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="monitoring">monitoring</span>
+</button>
+<button class="text-slate-500 hover:text-[#00FF41] transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="account_tree">account_tree</span>
+</button>
+</div>
+<!-- Search -->
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[14px] text-slate-500" data-icon="search">search</span>
+<input class="bg-surface-container h-6 pl-8 pr-2 text-[11px] font-mono text-primary outline-none border border-transparent focus:border-outline-variant focus:bg-surface-container-high placeholder-slate-600 w-48" placeholder="QUERY_DB..." type="text"/>
+</div>
+<!-- Primary Action -->
+<button class="font-['JetBrains_Mono'] text-[11px] text-[#00FF41] border border-outline-variant px-3 py-1 hover:bg-surface-container-high hover:glow-sm transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="code">code</span>
+                    DECODE_DIFF
+                </button>
+</div>
+</header>
+<!-- Dashboard Canvas -->
+<main class="flex-1 overflow-y-auto p-6 flex flex-col gap-6 relative">
+<!-- Top: Progress Meter -->
+<section class="bg-surface-container-low p-6 flex flex-col gap-4 relative overflow-hidden ghost-border">
+<div class="absolute top-0 left-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at top left, rgba(0, 255, 65, 0.05), transparent 50%);"></div>
+<div class="flex justify-between items-end relative z-10">
+<div>
+<h2 class="font-headline text-sm text-on-surface-variant uppercase mb-1">Operational Status</h2>
+<div class="font-headline text-3xl font-black text-primary tracking-tighter">HUNTING_PROGRESS</div>
+</div>
+<div class="text-right">
+<div class="font-mono text-xl text-primary">87.4%</div>
+<div class="font-mono text-[10px] text-slate-500">SECTORS_SCANNED</div>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="h-2 w-full bg-surface-container-highest relative z-10">
+<div class="h-full bg-primary relative" style="width: 87.4%;">
+<div class="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-primary glow-md"></div>
+</div>
+</div>
+<!-- Status Indicators -->
+<div class="grid grid-cols-3 gap-4 pt-4 border-t border-surface-variant relative z-10">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 bg-primary animate-pulse"></div>
+<div>
+<div class="font-label text-[10px] text-slate-500 uppercase">Engine Health</div>
+<div class="font-mono text-xs text-primary">OPTIMAL_99.9V</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary-fixed-dim text-[16px]" data-icon="speed">speed</span>
+<div>
+<div class="font-label text-[10px] text-slate-500 uppercase">Request Density</div>
+<div class="font-mono text-xs text-secondary-fixed-dim">45,210_REQ/S</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[16px]" data-icon="bug_report">bug_report</span>
+<div>
+<div class="font-label text-[10px] text-slate-500 uppercase">Findings Count</div>
+<div class="font-mono text-xs text-primary">1,492_SIGNATURES</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Layout: Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+<!-- Center: Scrolling Log (Spans 2 columns) -->
+<section class="lg:col-span-2 bg-surface-container-low flex flex-col ghost-border relative">
+<div class="p-4 border-b border-surface-variant flex justify-between items-center bg-surface-container-high/50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="manage_search">manage_search</span>
+<h3 class="font-headline text-xs uppercase tracking-widest text-on-surface">Live Interrogation Log</h3>
+</div>
+<div class="flex gap-2">
+<span class="bg-primary-container text-on-primary-container font-mono text-[9px] px-2 py-0.5 uppercase">Auto-Scroll_On</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 font-mono text-[11px] scan-line-container bg-[#0b0e14]">
+<div class="scan-line"></div>
+<!-- Log Entries -->
+<div class="flex gap-4 p-2 hover:bg-surface-variant transition-colors border-l-2 border-transparent hover:border-primary group">
+<div class="text-slate-500 w-20 shrink-0">14:02:41.09</div>
+<div class="text-secondary-fixed-dim shrink-0">[WARN]</div>
+<div class="text-on-surface flex-1">Rate limit approaching on api.github.com. Throttling concurrent threads to 45.</div>
+</div>
+<div class="flex gap-4 p-2 bg-primary/5 border-l-2 border-primary">
+<div class="text-slate-500 w-20 shrink-0">14:02:40.11</div>
+<div class="text-primary shrink-0">[HIT]</div>
+<div class="flex-1 flex flex-col gap-1">
+<span class="text-primary font-bold">Smoking Gun Discovered</span>
+<span class="text-on-surface-variant">Found relevant PR in <span class="text-tertiary-fixed underline decoration-outline-variant underline-offset-2">rust-lang/rust: #12345</span></span>
+<div class="bg-surface-container-highest p-2 mt-1 text-[10px] text-slate-400 border border-outline-variant">
+                                    &gt; Commit msg matches criteria "unsafe memory leak fix"<br/>
+                                    &gt; Author: @jdoe_dev | Confidence: 94%
+                                </div>
+</div>
+</div>
+<div class="flex gap-4 p-2 hover:bg-surface-variant transition-colors border-l-2 border-transparent hover:border-primary">
+<div class="text-slate-500 w-20 shrink-0">14:02:39.88</div>
+<div class="text-slate-400 shrink-0">[INFO]</div>
+<div class="text-on-surface">Scraping Kaggle dataset metadata: user_id: 88912...</div>
+</div>
+<div class="flex gap-4 p-2 hover:bg-surface-variant transition-colors border-l-2 border-transparent hover:border-primary">
+<div class="text-slate-500 w-20 shrink-0">14:02:39.45</div>
+<div class="text-slate-400 shrink-0">[INFO]</div>
+<div class="text-on-surface">Evaluating HuggingFace model weights repository...</div>
+</div>
+<div class="flex gap-4 p-2 hover:bg-surface-variant transition-colors border-l-2 border-transparent hover:border-primary">
+<div class="text-slate-500 w-20 shrink-0">14:02:38.12</div>
+<div class="text-secondary-container text-on-secondary-container px-1 py-0 shrink-0">[AI_SLOP_FLAG]</div>
+<div class="text-on-surface">Detected generic boilerplate profile description. Confidence 88%. Discarding candidate ID: 99xA1.</div>
+</div>
+</div>
+</section>
+<!-- Sidebar Panel: Visualizations -->
+<section class="bg-surface-container-low flex flex-col gap-4 ghost-border p-4 relative">
+<div class="absolute top-0 right-0 w-32 h-32 pointer-events-none" style="background: radial-gradient(circle at top right, rgba(255, 184, 0, 0.05), transparent 70%);"></div>
+<h3 class="font-headline text-xs uppercase tracking-widest text-on-surface border-b border-surface-variant pb-2">Active Targets Node Map</h3>
+<!-- Map Visualization Area -->
+<div class="h-48 bg-surface-container-lowest relative ghost-border overflow-hidden flex items-center justify-center">
+<div class="absolute inset-0 opacity-20" style="background-image: linear-gradient(#3b4b37 1px, transparent 1px), linear-gradient(90deg, #3b4b37 1px, transparent 1px); background-size: 20px 20px;"></div>
+<!-- Mock Nodes -->
+<div class="absolute top-1/4 left-1/4 w-2 h-2 bg-primary rounded-full glow-sm"></div>
+<div class="absolute top-1/2 left-2/3 w-3 h-3 bg-secondary-fixed-dim rounded-full glow-md"></div>
+<div class="absolute bottom-1/3 right-1/4 w-1.5 h-1.5 bg-primary rounded-full"></div>
+<!-- Connection Lines (SVG) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<line opacity="0.5" stroke="#84967e" stroke-dasharray="2,2" stroke-width="1" x1="25%" x2="66%" y1="25%" y2="50%"></line>
+<line opacity="0.5" stroke="#84967e" stroke-dasharray="2,2" stroke-width="1" x1="66%" x2="75%" y1="50%" y2="66%"></line>
+</svg>
+<span class="font-mono text-[9px] text-slate-500 absolute bottom-2 right-2">MAP_RENDER_ACTIVE</span>
+</div>
+<!-- Target Sources Breakdown -->
+<div class="flex-1 flex flex-col gap-3 mt-2">
+<div class="flex justify-between items-center text-[10px] font-mono">
+<span class="text-slate-400">GITHUB_API</span>
+<span class="text-primary">64%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest"><div class="h-full bg-primary w-[64%]"></div></div>
+<div class="flex justify-between items-center text-[10px] font-mono mt-2">
+<span class="text-slate-400">KAGGLE_DB</span>
+<span class="text-secondary-fixed-dim">22%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest"><div class="h-full bg-secondary-fixed-dim w-[22%]"></div></div>
+<div class="flex justify-between items-center text-[10px] font-mono mt-2">
+<span class="text-slate-400">HUGGINGFACE</span>
+<span class="text-tertiary-fixed-dim">14%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest"><div class="h-full bg-tertiary-fixed-dim w-[14%]"></div></div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</body></html>

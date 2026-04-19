@@ -1,53 +1,118 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createBrowserClient } from '@supabase/ssr';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { AgentPhase, AgentStatus } from '@/types';
+import { AgentPhase } from '@/types';
 import { cn } from '@/lib/utils';
 
-const phases: { phase: AgentPhase; label: string; icon: string; status: 'pending' | 'active' | 'complete' }[] = [
-  { phase: 'dispatching', label: 'Hydrating Prompt', icon: 'smart_toy', status: 'pending' },
-  { phase: 'navigating', label: 'Perplexity Web Search', icon: 'radar', status: 'pending' },
-  { phase: 'vetting', label: 'Credential Analysis', icon: 'shield', status: 'pending' },
-  { phase: 'awaiting_quote', label: 'Quote Generation', icon: 'request_quote', status: 'pending' },
-  { phase: 'quote_received', label: 'Recommendation Ready', icon: 'check_circle', status: 'pending' },
-  { phase: 'settling', label: 'On-Chain Settlement', icon: 'credit_card', status: 'pending' },
+const phases: { phase: AgentPhase; label: string; icon: string }[] = [
+  { phase: 'dispatching', label: 'Hydrating Prompt', icon: 'smart_toy' },
+  { phase: 'navigating', label: 'Perplexity Web Search', icon: 'radar' },
+  { phase: 'vetting', label: 'Credential Analysis', icon: 'shield' },
+  { phase: 'awaiting_quote', label: 'Quote Generation', icon: 'request_quote' },
+  { phase: 'quote_received', label: 'Recommendation Ready', icon: 'check_circle' },
+  { phase: 'settling', label: 'On-Chain Settlement', icon: 'credit_card' },
 ];
+
+interface LogEntry {
+  id?: string;
+  message: string;
+  phase?: string;
+  created_at?: string;
+}
 
 interface AgentTrackerProps {
   currentPhase: AgentPhase;
-  logs: any[];
+  logs: LogEntry[];
+  bountyId?: string;
 }
 
-export function AgentTracker({ currentPhase, logs }: AgentTrackerProps) {
-  const activeIndex = phases.findIndex(p => p.phase === currentPhase);
+export function AgentTracker({ currentPhase, logs, bountyId }: AgentTrackerProps) {
+  const [realtimeLogs, setRealtimeLogs] = useState<LogEntry[]>([]);
 
-  // Update phase statuses based on current phase
+  // Subscribe to Supabase Realtime for live agent_logs inserts
+  useEffect(() => {
+    if (!bountyId) {
+      setRealtimeLogs([]);
+      return;
+    }
+
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const channel = supabase
+      .channel(`agent_tracker:${bountyId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'agent_logs',
+          filter: `bounty_id=eq.${bountyId}`,
+        },
+        (payload) => {
+          const newLog = payload.new as LogEntry;
+          setRealtimeLogs((prev) => {
+            // Deduplicate by id if available, else by message+phase
+            const isDupe = prev.some((l) =>
+              newLog.id ? l.id === newLog.id : l.message === newLog.message && l.phase === newLog.phase
+            );
+            if (isDupe) return prev;
+            return [...prev, newLog];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [bountyId]);
+
+  // Merge prop logs + realtime logs, deduplicate by id or message+phase
+  const mergedLogs = (() => {
+    const all = [...logs, ...realtimeLogs];
+    const seen = new Set<string>();
+    return all.filter((l) => {
+      const key = l.id ?? `${l.phase}:${l.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+
+  const activeIndex = phases.findIndex((p) => p.phase === currentPhase);
+
   const updatedPhases = phases.map((p, index) => {
     if (index < activeIndex) return { ...p, status: 'complete' as const };
     if (index === activeIndex) return { ...p, status: 'active' as const };
     return { ...p, status: 'pending' as const };
   });
 
+  const latestMessage = mergedLogs[mergedLogs.length - 1]?.message;
+
   return (
     <Card className="bg-[#191c22] border-[#3b4b37]/20 p-6 flex flex-col relative overflow-hidden" style={{ borderRadius: '0px' }}>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between border-b border-[#3b4b37]/30 pb-4">
         <div className="flex items-center gap-3">
-           <div className="h-10 w-10 bg-[#00ff41]/10 border border-[#00ff41]/20 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#00ff41] animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>
-                radar
-              </span>
-           </div>
-           <div>
-             <h3 className="font-['Space_Grotesk'] font-bold text-lg tracking-tight uppercase">Perplexity Computer Agent</h3>
-             <div className="flex items-center gap-1.5">
-               <span className="w-2 h-2 bg-[#00ff41] animate-pulse"></span>
-               <span className="text-[10px] font-mono text-[#00ff41] uppercase tracking-widest">SONAR-DEEP-RESEARCH</span>
-             </div>
-           </div>
+          <div className="h-10 w-10 bg-[#00ff41]/10 border border-[#00ff41]/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-[#00ff41] animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>
+              radar
+            </span>
+          </div>
+          <div>
+            <h3 className="font-['Space_Grotesk'] font-bold text-lg tracking-tight uppercase">Perplexity Computer Agent</h3>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-[#00ff41] animate-pulse"></span>
+              <span className="text-[10px] font-mono text-[#00ff41] uppercase tracking-widest">SONAR-DEEP-RESEARCH</span>
+            </div>
+          </div>
         </div>
         <Badge className="bg-[#00ff41]/10 text-[#00ff41] border-[#00ff41]/20 font-mono text-[10px] uppercase">
           ACTIVE
@@ -65,40 +130,40 @@ export function AgentTracker({ currentPhase, logs }: AgentTrackerProps) {
             <motion.div
               key={p.phase}
               initial={{ opacity: 0, x: -10 }}
-              animate={{ 
+              animate={{
                 opacity: isPending ? 0.4 : 1,
                 x: 0,
-                scale: isActive ? 1.02 : 1
+                scale: isActive ? 1.02 : 1,
               }}
               className="relative pl-10"
             >
               {/* Connector line */}
               {index < phases.length - 1 && (
                 <div className={cn(
-                  "absolute left-[15px] top-8 w-[2px] h-8 transition-colors duration-500",
-                  isCompleted ? "bg-[#00ff41]/50" : "bg-[#3b4b37]"
+                  'absolute left-[15px] top-8 w-[2px] h-8 transition-colors duration-500',
+                  isCompleted ? 'bg-[#00ff41]/50' : 'bg-[#3b4b37]'
                 )} />
               )}
 
               {/* Icon / Status */}
               <div className={cn(
-                "absolute left-0 top-0 h-10 w-10 border flex items-center justify-center transition-all duration-500",
-                isActive ? "bg-[#00ff41] border-[#00ff41] shadow-[0_0_15px_rgba(0,255,65,0.5)]" : 
-                isCompleted ? "bg-[#00ff41]/10 border-[#00ff41]/30" : "bg-[#1d2026] border-[#3b4b37]"
+                'absolute left-0 top-0 h-10 w-10 border flex items-center justify-center transition-all duration-500',
+                isActive
+                  ? 'bg-[#00ff41] border-[#00ff41] shadow-[0_0_15px_rgba(0,255,65,0.5)]'
+                  : isCompleted
+                  ? 'bg-[#00ff41]/10 border-[#00ff41]/30'
+                  : 'bg-[#1d2026] border-[#3b4b37]'
               )}>
                 {isActive ? (
                   <span className="material-symbols-outlined text-[#003907] animate-spin text-[18px]">
                     progress_activity
                   </span>
                 ) : isCompleted ? (
-                   <span className="material-symbols-outlined text-[#00ff41] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  <span className="material-symbols-outlined text-[#00ff41] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                     check_circle
-                   </span>
+                  </span>
                 ) : (
-                  <span className={cn(
-                    "material-symbols-outlined text-[18px]",
-                    isPending ? "text-[#84967e]" : ""
-                  )}>
+                  <span className={cn('material-symbols-outlined text-[18px]', isPending ? 'text-[#84967e]' : '')}>
                     {p.icon}
                   </span>
                 )}
@@ -108,11 +173,11 @@ export function AgentTracker({ currentPhase, logs }: AgentTrackerProps) {
               <div className="flex flex-col gap-1">
                 <span className={cn(
                   "text-xs font-['Space_Grotesk'] uppercase tracking-widest transition-colors",
-                  isActive ? "text-[#00ff41] font-bold" : isCompleted ? "text-[#e1e2eb]/70" : "text-[#84967e]"
+                  isActive ? 'text-[#00ff41] font-bold' : isCompleted ? 'text-[#e1e2eb]/70' : 'text-[#84967e]'
                 )}>
                   Phase 0{index + 1}: {p.label}
                 </span>
-                
+
                 <AnimatePresence mode="wait">
                   {isActive && (
                     <motion.p
@@ -121,7 +186,7 @@ export function AgentTracker({ currentPhase, logs }: AgentTrackerProps) {
                       exit={{ opacity: 0 }}
                       className="text-sm font-mono text-[#e1e2eb]/90 leading-relaxed"
                     >
-                      {logs[logs.length - 1]?.message || `Executing ${p.label.toLowerCase()} sub-tasks...`}
+                      {latestMessage || `Executing ${p.label.toLowerCase()} sub-tasks...`}
                     </motion.p>
                   )}
                 </AnimatePresence>
@@ -133,19 +198,28 @@ export function AgentTracker({ currentPhase, logs }: AgentTrackerProps) {
 
       {/* Progress Footer */}
       <div className="mt-6 pt-6 border-t border-[#3b4b37]/30">
-         <div className="flex justify-between items-center mb-2">
-            <span className="text-[10px] font-mono text-[#84967e] uppercase">Compliance Progress</span>
-            <span className="text-[10px] font-mono text-[#00ff41]">{(activeIndex + 1) * 16}%</span>
-         </div>
-         <div className="h-1 bg-[#272a31] border border-[#3b4b37]/30 relative overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${(activeIndex + 1) * 16}%` }}
-              className="h-full bg-[#00ff41] relative"
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-3 bg-[#0b0e14]"></div>
-            </motion.div>
-         </div>
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-[10px] font-mono text-[#84967e] uppercase">Compliance Progress</span>
+          <span className="text-[10px] font-mono text-[#00ff41]">{(activeIndex + 1) * 16}%</span>
+        </div>
+        <div className="h-1 bg-[#272a31] border border-[#3b4b37]/30 relative overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${(activeIndex + 1) * 16}%` }}
+            className="h-full bg-[#00ff41] relative"
+          >
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-3 bg-[#0b0e14]"></div>
+          </motion.div>
+        </div>
+        {/* Realtime log count indicator */}
+        {bountyId && realtimeLogs.length > 0 && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 bg-[#00ff41] rounded-full animate-pulse" />
+            <span className="font-mono text-[9px] text-[#00ff41]">
+              {realtimeLogs.length} REALTIME LOG{realtimeLogs.length !== 1 ? 'S' : ''} RECEIVED
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Ambient Glow Effect */}

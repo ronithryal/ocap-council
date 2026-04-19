@@ -7,6 +7,7 @@ import { BountyInput } from '@/components/bounty/BountyInput';
 import { HydrationChat } from '@/components/bounty/HydrationChat';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
 import { QuoteCard } from '@/components/settlement/QuoteCard';
+import { CandidateGrid, AlternativeCandidate } from '@/components/settlement/CandidateGrid';
 import { ForensicDashboard } from '@/components/forensic/ForensicDashboard';
 import { Button } from '@/components/ui/button';
 import { AgentPhase, Vendor, ForensicScore } from '@/types';
@@ -31,13 +32,9 @@ function computeTelemetry(text: string) {
   const techKeywords = (text.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|api|async|concurrent|distributed|state|machine|architecture|system|design|performance|latency|throughput|memory|race|condition|mutex|channel|interface|lifetime|generic|trait|protocol|consensus|raft|paxos|sharding|replication)\b/gi) || []).length;
   const constraints = (text.match(/\b(must|require|need|should|only|never|always|strict|exactly|minimum|maximum|at least|no more than)\b/gi) || []).length;
 
-  // Clarity: longer, more structured text = clearer
   const clarity = Math.min(1, (words / 80) * 0.5 + (sentences / 5) * 0.3 + (techKeywords / 5) * 0.2);
-  // Constraint density: explicit requirements
   const constraint = Math.min(1, (constraints / 6) * 0.6 + (techKeywords / 8) * 0.4);
-  // Ambiguity: short vague text = high ambiguity
   const ambiguity = Math.max(0, 1 - clarity * 0.7 - constraint * 0.3);
-  // Overall build %: weighted average
   const finalPromptBuild = Math.round((clarity * 40 + constraint * 40 + (1 - ambiguity) * 20));
   const estCompletion = finalPromptBuild >= 80 ? 'READY' : finalPromptBuild >= 50 ? '1_ITERATION' : '2_ITERATIONS';
 
@@ -53,27 +50,30 @@ function computeTelemetry(text: string) {
 export default function Home() {
   const [phase, setPhase] = useState<AgentPhase>('idle');
   const [initialPrompt, setInitialPrompt] = useState<string>('');
-  const [draftPrompt, setDraftPrompt] = useState<string>(''); // live text for telemetry
+  const [draftPrompt, setDraftPrompt] = useState<string>('');
   const [logs, setLogs] = useState<{ message: string }[]>([]);
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [alternatives, setAlternatives] = useState<AlternativeCandidate[]>([]);
   const [bountyId, setBountyId] = useState<string | null>(null);
   const [forensicReport, setForensicReport] = useState<ForensicScore | null>(null);
   const [isForensicLoading, setIsForensicLoading] = useState(false);
   const [isSettled, setIsSettled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rawAgentOutput, setRawAgentOutput] = useState<string | null>(null);
+  const [rawOutputExpanded, setRawOutputExpanded] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
-  // Live telemetry computed from draft prompt
   const telemetry = computeTelemetry(draftPrompt);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // Load sessions from Supabase bounties table
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
     supabase
       .from('bounties')
       .select('id, title, description, agent_phase, created_at')
@@ -96,7 +96,92 @@ export default function Home() {
         }
         setSessionsLoading(false);
       });
-  }, [isSettled, bountyId]); // refresh when a new bounty completes
+  }, [isSettled, bountyId]);
+
+  // Load a previous bounty session by ID
+  const loadBounty = useCallback(async (id: string) => {
+    if (id === bountyId) return; // already loaded
+    try {
+      // Fetch primary vendor
+      const { data: vendors } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('bounty_id', id)
+        .order('created_at', { ascending: true });
+
+      const primaryVendor = vendors?.find((v) => v.is_primary !== false) ?? vendors?.[0] ?? null;
+      const altVendors = vendors?.filter((v) => v.is_primary === false) ?? [];
+
+      // Fetch most recent engineer report
+      const { data: reports } = await supabase
+        .from('engineer_reports')
+        .select('*')
+        .eq('bounty_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const report = reports?.[0] ?? null;
+
+      // Fetch agent logs
+      const { data: agentLogs } = await supabase
+        .from('agent_logs')
+        .select('message')
+        .eq('bounty_id', id)
+        .order('created_at', { ascending: true })
+        .limit(30);
+
+      setBountyId(id);
+      setLogs(agentLogs || []);
+      setForensicReport(null);
+      setAlternatives([]);
+      setError(null);
+      setRawAgentOutput(null);
+
+      if (primaryVendor) {
+        setVendor({
+          id: primaryVendor.id,
+          bountyId: id,
+          name: primaryVendor.name,
+          credentials: primaryVendor.credentials || '',
+          quoteAmount: primaryVendor.quote_amount || 0,
+          linkedinUrl: primaryVendor.linkedin_url,
+          githubUrl: primaryVendor.github_url,
+          websiteUrl: primaryVendor.website_url,
+          summary: primaryVendor.summary || '',
+          isVerified: primaryVendor.is_verified ?? true,
+        });
+        setAlternatives(altVendors.map((v) => ({
+          id: v.id,
+          name: v.name,
+          credentials: v.credentials || '',
+          githubUrl: v.github_url,
+          summary: v.summary || '',
+          quoteAmount: v.quote_amount || 0,
+        })));
+      } else {
+        setVendor(null);
+      }
+
+      if (report) {
+        setForensicReport({
+          gritScore: report.grit_score,
+          archetype: report.archetype || 'Uncategorized',
+          dimensions: report.dimensions || { edgeCaseDensity: 0, architecturalIntent: 0, codeFingerprint: 0, testingRigor: 0 },
+          gritMarkers: report.grit_markers || [],
+          redFlags: report.red_flags || [],
+          justification: report.justification || '',
+          recommendation: report.recommendation || 'NEEDS_HUMAN_REVIEW',
+        });
+        setPhase('quote_received');
+      } else if (primaryVendor) {
+        setPhase('quote_received');
+      } else {
+        setPhase('idle');
+      }
+    } catch (err: any) {
+      console.error('Failed to load bounty:', err);
+    }
+  }, [bountyId, supabase]);
 
   const startHydration = (data: any) => {
     setInitialPrompt(data.description);
@@ -104,15 +189,22 @@ export default function Home() {
     setPhase('hydrating');
   };
 
-  const runForensicAnalysis = async () => {
-    if (!vendor || !bountyId) return;
+  const runForensicAnalysis = async (overrideVendor?: Vendor) => {
+    const targetVendor = overrideVendor || vendor;
+    if (!targetVendor || !bountyId) return;
+
+    // If switching to an alternative, update active vendor
+    if (overrideVendor) {
+      setVendor(overrideVendor);
+    }
+
     setIsForensicLoading(true);
     setPhase('vetting');
     try {
       const res = await fetch(`/api/bounty/${bountyId}/diligence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId: vendor.id }),
+        body: JSON.stringify({ vendorId: targetVendor.id }),
       });
       if (!res.ok) throw new Error('Forensic analysis failed');
       const data = await res.json();
@@ -122,17 +214,36 @@ export default function Home() {
     } catch (err: any) {
       setError(err.message);
       setLogs(prev => [...prev, { message: `Forensic Analysis failed: ${err.message}` }]);
+      setPhase('quote_received');
     } finally {
       setIsForensicLoading(false);
     }
   };
 
+  // Handler for selecting an alternative candidate from CandidateGrid
+  const handleSelectAlternative = (candidate: AlternativeCandidate) => {
+    const altAsVendor: Vendor = {
+      id: candidate.id,
+      bountyId: bountyId || '',
+      name: candidate.name,
+      credentials: candidate.credentials,
+      quoteAmount: candidate.quoteAmount || 0,
+      githubUrl: candidate.githubUrl ?? undefined,
+      summary: candidate.summary,
+      isVerified: false,
+    };
+    setForensicReport(null);
+    runForensicAnalysis(altAsVendor);
+  };
+
   const handleDispatch = async (finalPrompt: string) => {
     setPhase('dispatching');
     setVendor(null);
+    setAlternatives([]);
     setForensicReport(null);
     setIsSettled(false);
     setError(null);
+    setRawAgentOutput(null);
     setIsLoading(true);
     setLogs([{ message: 'OCAP Council initialized. Submitting bounty...' }]);
     try {
@@ -146,17 +257,30 @@ export default function Home() {
       setBountyId(bounty.id);
       setPhase('navigating');
       setLogs(prev => [...prev, { message: 'Bounty created. Dispatching Perplexity Computer Agent...' }]);
+
       const dispatchRes = await fetch(`/api/bounty/${bounty.id}/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      if (!dispatchRes.ok) {
-        const errData = await dispatchRes.json();
-        throw new Error(errData.error || 'Agent dispatch failed');
+
+      // Capture raw text before JSON parsing for error recovery
+      const rawText = await dispatchRes.text();
+      let result: any;
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        setRawAgentOutput(rawText);
+        throw new Error('Agent returned non-JSON response (rate limit or parse error)');
       }
-      const result = await dispatchRes.json();
+
+      if (!dispatchRes.ok) {
+        if (result?.rawOutput) setRawAgentOutput(result.rawOutput);
+        throw new Error(result?.error || 'Agent dispatch failed');
+      }
+
       setPhase('quote_received');
       setLogs(prev => [...prev, { message: `Council Recommendation ready: ${result.vendor?.name || 'Vendor found'}` }]);
+
       if (result.vendor) {
         setVendor({
           id: result.vendor.id,
@@ -171,6 +295,15 @@ export default function Home() {
           isVerified: result.vendor.isVerified ?? true,
         });
       }
+
+      if (result.alternatives && result.alternatives.length > 0) {
+        setAlternatives(result.alternatives);
+      }
+
+      // Store raw output for debugging even on success
+      if (result.rawOutput) {
+        setRawAgentOutput(result.rawOutput);
+      }
     } catch (err: any) {
       setPhase('failed');
       setError(err.message);
@@ -183,15 +316,17 @@ export default function Home() {
   const resetAll = () => {
     setPhase('idle');
     setVendor(null);
+    setAlternatives([]);
     setForensicReport(null);
     setIsSettled(false);
     setLogs([]);
     setBountyId(null);
     setError(null);
+    setRawAgentOutput(null);
+    setRawOutputExpanded(false);
     setDraftPrompt('');
   };
 
-  // Context depth: based on telemetry
   const contextDepth = Math.min(100, telemetry.finalPromptBuild + (phase !== 'idle' ? 20 : 0));
 
   return (
@@ -257,6 +392,7 @@ export default function Home() {
             {sessions.map((s) => (
               <div
                 key={s.id}
+                onClick={() => loadBounty(s.id)}
                 className={`mx-2 mb-1 p-3 border cursor-pointer transition-colors ${
                   s.id === bountyId
                     ? 'border-[#00ff41]/30 bg-[#00ff41]/5'
@@ -276,7 +412,7 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Context depth — live from telemetry */}
+          {/* Context depth */}
           <div className="px-4 py-3 border-t border-[#1a1f26]/40">
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-mono text-[9px] text-[#84967e] uppercase">CONTEXT DEPTH</span>
@@ -312,7 +448,12 @@ export default function Home() {
               )}
               {phase !== 'idle' && phase !== 'hydrating' && (
                 <motion.div key="tracker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                  <AgentTracker currentPhase={phase} logs={logs} />
+                  <AgentTracker
+                    currentPhase={phase}
+                    logs={logs}
+                    bountyId={bountyId ?? undefined}
+                  />
+
                   {forensicReport && (
                     <ForensicDashboard
                       report={forensicReport}
@@ -322,9 +463,19 @@ export default function Home() {
                       onDoNotHire={resetAll}
                     />
                   )}
+
                   {vendor && !forensicReport && (
                     <div className="space-y-4">
                       <QuoteCard vendor={vendor} onSettled={() => setIsSettled(true)} />
+
+                      {/* Alternative candidates */}
+                      {alternatives.length > 0 && (
+                        <CandidateGrid
+                          candidates={alternatives}
+                          onSelect={handleSelectAlternative}
+                        />
+                      )}
+
                       <div className="bg-[#191c22] border border-[#00ff41]/20 p-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 bg-[#00ff41]/10 border border-[#00ff41]/20 flex items-center justify-center">
@@ -336,7 +487,7 @@ export default function Home() {
                           </div>
                         </div>
                         <Button
-                          onClick={runForensicAnalysis}
+                          onClick={() => runForensicAnalysis()}
                           disabled={isForensicLoading}
                           className="bg-[#00ff41] hover:bg-[#72ff70] text-[#003907] font-['Space_Grotesk'] font-bold h-10 px-5 shadow-[0_0_16px_rgba(0,255,65,0.25)] transition-all"
                           style={{ borderRadius: '0px' }}
@@ -346,10 +497,35 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+
+                  {/* Failed state with error recovery */}
                   {phase === 'failed' && (
-                    <div className="border border-[#ffb4ab]/20 bg-[#93000a]/5 p-8 text-center">
+                    <div className="border border-[#ffb4ab]/20 bg-[#93000a]/5 p-8">
                       <div className="font-['Space_Grotesk'] font-bold text-[#ffb4ab] mb-2">AGENT DISPATCH FAILED</div>
                       <p className="font-mono text-[10px] text-[#84967e] mb-4">{error}</p>
+
+                      {/* Raw agent output expandable */}
+                      {rawAgentOutput && (
+                        <div className="mb-4">
+                          <button
+                            onClick={() => setRawOutputExpanded(v => !v)}
+                            className="flex items-center gap-2 font-mono text-[9px] text-[#feb700] hover:text-[#ffba20] uppercase tracking-widest mb-2 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">
+                              {rawOutputExpanded ? 'expand_less' : 'expand_more'}
+                            </span>
+                            RAW AGENT OUTPUT {rawOutputExpanded ? '▲' : '▼'}
+                          </button>
+                          {rawOutputExpanded && (
+                            <div className="bg-[#10131a] border border-[#feb700]/20 p-3 max-h-48 overflow-y-auto">
+                              <pre className="font-mono text-[9px] text-[#84967e] whitespace-pre-wrap break-all">
+                                {rawAgentOutput}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <button onClick={resetAll} className="px-4 py-2 bg-[#1d2026] border border-[#3b4b37] text-[#e1e2eb] font-['Space_Grotesk'] font-bold text-[10px] uppercase hover:bg-[#272a31] transition-colors">
                         TRY AGAIN
                       </button>
@@ -371,7 +547,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Col 3: Prompt Telemetry — live */}
+        {/* Col 3: Prompt Telemetry */}
         <div className="w-[260px] flex-shrink-0 flex flex-col bg-[#0b0e14]">
           <div className="px-5 py-4 border-b border-[#1a1f26]/40">
             <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-sm uppercase tracking-tight">PROMPT TELEMETRY</div>
@@ -398,7 +574,7 @@ export default function Home() {
             <div className="font-mono text-[9px] text-[#84967e] mt-1.5">EST_COMPLETION: {telemetry.estCompletion}</div>
           </div>
 
-          {/* Hunting readiness vectors — live */}
+          {/* Hunting readiness vectors */}
           <div className="px-5 py-4 border-b border-[#1a1f26]/40">
             <div className="font-['Space_Grotesk'] text-[9px] uppercase tracking-widest text-[#84967e] mb-3">HUNTING READINESS VECTORS</div>
             {[
@@ -437,6 +613,12 @@ export default function Home() {
                   <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
                     <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">SMOKING GUN</div>
                     <a href={vendor.githubUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-[9px] text-[#00ff41] truncate block hover:underline">{vendor.githubUrl}</a>
+                  </div>
+                )}
+                {alternatives.length > 0 && (
+                  <div className="bg-[#10131a] border border-[#feb700]/20 p-3">
+                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">ALTERNATIVES</div>
+                    <div className="font-['Space_Grotesk'] font-bold text-[#feb700] text-[11px]">{alternatives.length} candidate{alternatives.length !== 1 ? 's' : ''}</div>
                   </div>
                 )}
               </div>

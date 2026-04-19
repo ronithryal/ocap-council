@@ -90,7 +90,7 @@ export async function POST(
       message: `Vendor identified: ${findings.selectedVendor.name}. Calculating market-rate quote...`,
     }]);
 
-    // 8. Store the vendor in the database
+    // 8. Store the primary vendor in the database
     const { data: vendor, error: vendorError } = await supabase
       .from('vendors')
       .insert([{
@@ -102,12 +102,40 @@ export async function POST(
         github_url: findings.selectedVendor.githubUrl,
         summary: findings.selectedVendor.summary,
         is_verified: findings.selectedVendor.isVerified ?? true,
+        is_primary: true,
       }])
       .select()
       .single();
 
     if (vendorError) {
-      console.error('Error storing vendor:', vendorError);
+      console.error('Error storing primary vendor:', vendorError);
+    }
+
+    // 8b. Store alternative vendors (is_primary: false)
+    let alternativeRows: any[] = [];
+    if (findings.alternativeVendors && findings.alternativeVendors.length > 0) {
+      const altInserts = findings.alternativeVendors.map((alt) => ({
+        bounty_id: id,
+        name: alt.name || 'Unknown',
+        credentials: alt.credentials || '',
+        quote_amount: alt.quoteAmount || 0,
+        linkedin_url: alt.linkedinUrl ?? null,
+        github_url: alt.githubUrl ?? null,
+        summary: alt.summary || '',
+        is_verified: false,
+        is_primary: false,
+      }));
+
+      const { data: altData, error: altError } = await supabase
+        .from('vendors')
+        .insert(altInserts)
+        .select();
+
+      if (altError) {
+        console.error('Error storing alternative vendors:', altError);
+      } else {
+        alternativeRows = altData || [];
+      }
     }
 
     // 9. Mark as quote_received
@@ -133,6 +161,14 @@ export async function POST(
         ...findings.selectedVendor,
         id: vendor?.id ?? null,  // include the real DB UUID
       },
+      alternatives: alternativeRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        credentials: row.credentials,
+        githubUrl: row.github_url,
+        summary: row.summary,
+        quoteAmount: row.quote_amount,
+      })),
       alternativeCount: findings.alternativeVendors.length,
       rawOutput: findings.rawAgentOutput,
     });

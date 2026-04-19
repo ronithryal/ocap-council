@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Forensic Audit - The .diff Lab</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;900&amp;family=Inter:wght@400;600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-container": "#6b4b00",
+                        "tertiary-fixed": "#ffdcbd",
+                        "primary-container": "#00ff41",
+                        "surface-container-highest": "#32353c",
+                        "background": "#10131a",
+                        "inverse-primary": "#006e16",
+                        "surface-container": "#1d2026",
+                        "on-background": "#e1e2eb",
+                        "secondary-fixed": "#ffdea8",
+                        "secondary-fixed-dim": "#ffba20",
+                        "surface-container-low": "#191c22",
+                        "error-container": "#93000a",
+                        "surface-variant": "#32353c",
+                        "surface-bright": "#363940",
+                        "inverse-surface": "#e1e2eb",
+                        "on-surface": "#e1e2eb",
+                        "on-error": "#690005",
+                        "on-surface-variant": "#b9ccb2",
+                        "secondary": "#ffdb9d",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#10131a",
+                        "outline": "#84967e",
+                        "error": "#ffb4ab",
+                        "secondary-container": "#feb700",
+                        "on-tertiary": "#442b10",
+                        "on-tertiary-fixed-variant": "#5d4124",
+                        "on-primary": "#003907",
+                        "surface-tint": "#00e639",
+                        "tertiary-container": "#ffd5ae",
+                        "outline-variant": "#3b4b37",
+                        "on-primary-fixed": "#002203",
+                        "on-primary-fixed-variant": "#00530e",
+                        "inverse-on-surface": "#2e3037",
+                        "primary": "#ebffe2",
+                        "on-tertiary-fixed": "#2c1701",
+                        "on-secondary": "#412d00",
+                        "surface-container-lowest": "#0b0e14",
+                        "surface": "#10131a",
+                        "tertiary-fixed-dim": "#e7bf99",
+                        "on-primary-container": "#007117",
+                        "tertiary": "#fff8f4",
+                        "on-tertiary-container": "#7a5b3c",
+                        "on-secondary-fixed-variant": "#5e4200",
+                        "surface-container-high": "#272a31",
+                        "on-secondary-fixed": "#271900",
+                        "primary-fixed-dim": "#00e639",
+                        "primary-fixed": "#72ff70"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "0px"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .ghost-border { border: 1px solid rgba(132, 150, 126, 0.2); }
+        .glass-panel { backdrop-filter: blur(12px); background-color: rgba(50, 53, 60, 0.8); }
+        .ambient-glow-primary { box-shadow: 0 0 32px rgba(0, 230, 57, 0.1); }
+        .ambient-glow-secondary { box-shadow: 0 0 32px rgba(254, 183, 0, 0.1); }
+        .technical-trace:hover::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: #72ff70;
+        }
+        .surgical-hover:hover { color: #ebffe2; text-shadow: 0 0 8px rgba(0, 230, 57, 0.5); }
+        
+        /* Diff Specific Colors */
+        .diff-add { background-color: rgba(0, 255, 65, 0.05); color: #00FF41; }
+        .diff-remove { background-color: rgba(255, 180, 171, 0.05); color: #ffb4ab; }
+        .diff-context { color: #b9ccb2; }
+        .diff-line-num { color: #3b4b37; }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body h-screen flex overflow-hidden">
+<!-- SideNavBar (from JSON) -->
+<nav class="bg-[#0b0e14] h-screen flex flex-col fixed left-0 top-0 z-40 rounded-none border-r border-[#1a1f26] w-20 md:w-64">
+<div class="flex-shrink-0 p-6 border-b border-[#1a1f26] flex items-center gap-4 bg-[#10131a]">
+<img alt="CTO Profile" class="w-10 h-10 object-cover" data-alt="close up professional headshot of a man with serious expression in dark dramatic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBzfnBvP4oHSI-raR6kdwkb2eqiYFmkB1AjqlkZpzPxMgP9Trtths67F294jznBkLM6KPDv49fzjrR6Ij_Ac8BaFy_lfqzCXoTH2VeH3i_uGoPzw7YW37b_vZgk00NUounEbjAvNrrTu-AoLQl4oiqHD-008-VZIVCwqsG6SnTKhwFqefrWZd8o40s6A9g-GwywbtJQvPAHthY12MgQADIdXP8yEi2-BJYDUNcnU4VnqnZGo1-eJg2--V3l99A7ay4H_-LQj6A-Ysc"/>
+<div class="hidden md:block">
+<div class="font-['Space_Grotesk'] font-black text-[#00FF41] tracking-tighter text-xl leading-none">FORENSIC_OS</div>
+<div class="font-['Space_Grotesk'] tracking-tight text-xs uppercase text-slate-500 mt-1">V2.4.0_STABLE</div>
+</div>
+</div>
+<div class="flex-grow flex flex-col pt-4">
+<a class="text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 flex items-center px-6 py-4 gap-4 relative group" href="#">
+<span class="material-symbols-outlined group-hover:text-[#00FF41]">smart_toy</span>
+<span class="hidden md:block font-['Space_Grotesk'] tracking-tight text-xs uppercase">Architect</span>
+</a>
+<a class="text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 flex items-center px-6 py-4 gap-4 relative group" href="#">
+<span class="material-symbols-outlined group-hover:text-[#00FF41]">radar</span>
+<span class="hidden md:block font-['Space_Grotesk'] tracking-tight text-xs uppercase">Hunting</span>
+</a>
+<a class="text-[#00FF41] bg-[#00FF41]/5 border-l-2 border-[#00FF41] flex items-center px-6 py-4 gap-4 relative group" href="#">
+<span class="material-symbols-outlined text-[#00FF41]">biotech</span>
+<span class="hidden md:block font-['Space_Grotesk'] tracking-tight text-xs uppercase text-[#00FF41]">Audit</span>
+</a>
+<a class="text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 flex items-center px-6 py-4 gap-4 relative group" href="#">
+<span class="material-symbols-outlined group-hover:text-[#00FF41]">description</span>
+<span class="hidden md:block font-['Space_Grotesk'] tracking-tight text-xs uppercase">Diligence</span>
+</a>
+</div>
+<div class="p-6">
+<button class="w-full bg-[#00FF41] text-[#003907] font-['Space_Grotesk'] font-bold text-xs py-3 uppercase tracking-wider hover:bg-[#72ff70] transition-colors active:opacity-50">INIT_SCAN</button>
+</div>
+<div class="mt-auto border-t border-[#1a1f26] bg-[#10131a]">
+<a class="text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 flex items-center px-6 py-4 gap-4 relative group" href="#">
+<span class="material-symbols-outlined group-hover:text-[#00FF41]">terminal</span>
+<span class="hidden md:block font-['Space_Grotesk'] tracking-tight text-xs uppercase">Terminal</span>
+</a>
+<a class="text-slate-500 hover:text-slate-300 hover:bg-[#1a1f26] hover:text-[#00FF41] transition-colors duration-100 flex items-center px-6 py-4 gap-4 relative group" href="#">
+<span class="material-symbols-outlined group-hover:text-[#00FF41]">list_alt</span>
+<span class="hidden md:block font-['Space_Grotesk'] tracking-tight text-xs uppercase">Logs</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-grow ml-20 md:ml-64 flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar (from JSON) -->
+<nav class="flex items-center justify-between w-full h-12 px-6 sticky top-0 z-50 bg-[#0b0e14]/90 backdrop-blur-md rounded-none border-b border-[#1a1f26]">
+<div class="font-['Space_Grotesk'] font-bold text-[#00FF41] text-lg tracking-tight">CONSOLE_ALPHA</div>
+<div class="flex items-center gap-6">
+<!-- Search on Right (Implicitly handled by layout) -->
+<div class="flex items-center gap-4 text-slate-500 font-['JetBrains_Mono'] text-[11px]">
+<button class="hover:text-[#00FF41] transition-colors flex items-center justify-center p-1"><span class="material-symbols-outlined text-[18px]">security</span></button>
+<button class="hover:text-[#00FF41] transition-colors flex items-center justify-center p-1"><span class="material-symbols-outlined text-[18px]">monitoring</span></button>
+<button class="hover:text-[#00FF41] transition-colors flex items-center justify-center p-1"><span class="material-symbols-outlined text-[18px]">account_tree</span></button>
+</div>
+<button class="text-[#00FF41] font-bold underline decoration-[#00FF41] underline-offset-4 font-['JetBrains_Mono'] text-[11px] hover:text-[#72ff70] transition-colors tracking-widest uppercase">DECODE_DIFF</button>
+</div>
+</nav>
+<!-- PR Metadata Bar -->
+<div class="bg-surface-container-low px-6 py-4 flex items-center justify-between ghost-border relative">
+<div class="absolute top-0 left-0 w-32 h-32 bg-primary-container opacity-5 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex items-center gap-8 relative z-10">
+<div>
+<div class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-1">&gt; TARGET_REPO_</div>
+<div class="font-mono text-primary text-sm">core-engine-v3</div>
+</div>
+<div>
+<div class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-1">&gt; COMMIT_AUTHOR_</div>
+<div class="font-mono text-primary text-sm flex items-center gap-2">
+<img alt="Author" class="w-5 h-5 object-cover grayscale" data-alt="black and white headshot of a focused male developer looking away" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwnV9qpk_ofkyfej-boKBnT8Tdt0_LBSLDdbu_Q7NW6LHnY8JdqN4w9VX73ApbcKfcGwQJY7UAxiTF84LW2J6l8Vh1cFEmqDhkiJV_XRdxLHfsXrMNwxvetgsQXCn9MV9Va6iMHi4yIR9exs_usyEreEjOpauQ5aBfeGYlY4uDoEXrGroMn6mSRF2-t_JG7qQj42-uMP-TLcWn-eDqnfaVB8wpiBm_THmm-BpQDS5Y8rySjjrYwynVgj6MAUIaefTrRMhK1CCNATic"/>
+                        J.Denton
+                    </div>
+</div>
+</div>
+<div class="flex items-center gap-6 relative z-10">
+<div class="text-right">
+<div class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-1">&gt; COMPLEXITY_SCORE_</div>
+<div class="font-headline font-bold text-primary-fixed text-xl leading-none">8.9<span class="text-sm text-outline">/10</span></div>
+</div>
+<div class="h-10 w-px bg-outline-variant"></div>
+<div class="text-right">
+<div class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-1">&gt; STATUS_</div>
+<div class="bg-error-container text-on-error-container font-mono text-xs px-2 py-1 uppercase tracking-widest inline-block border border-error/30">FLAGGED</div>
+</div>
+</div>
+</div>
+<!-- Diff Viewer Core Layout -->
+<div class="flex-grow flex overflow-hidden">
+<!-- Left Margin: Grit Markers -->
+<div class="w-64 bg-surface-dim p-4 overflow-y-auto flex flex-col gap-4 border-r border-surface-container">
+<h3 class="font-label text-xs text-on-surface-variant uppercase tracking-widest mb-2 border-b border-outline-variant pb-2">Grit_Markers</h3>
+<div class="bg-surface-container-low p-3 relative technical-trace group cursor-pointer ghost-border hover:bg-surface-container transition-colors">
+<div class="flex items-start justify-between mb-2">
+<span class="material-symbols-outlined text-primary-fixed text-[18px]">memory</span>
+<span class="bg-primary-container text-on-primary-container font-label text-[10px] px-1 uppercase">INTENTIONAL</span>
+</div>
+<div class="font-label text-xs text-on-surface uppercase mb-1 group-hover:text-primary transition-colors">Manual Memory Mgmt</div>
+<div class="font-body text-[11px] text-on-surface-variant">Direct allocation detected outside of safe scope. Developer intent clear.</div>
+</div>
+<div class="bg-surface-container-low p-3 relative technical-trace group cursor-pointer ghost-border hover:bg-surface-container transition-colors">
+<div class="flex items-start justify-between mb-2">
+<span class="material-symbols-outlined text-secondary-fixed text-[18px]">warning</span>
+<span class="bg-secondary-container text-on-secondary-container font-label text-[10px] px-1 uppercase">HIGH</span>
+</div>
+<div class="font-label text-xs text-on-surface uppercase mb-1 group-hover:text-secondary transition-colors">Edge Case Density</div>
+<div class="font-body text-[11px] text-on-surface-variant">Cyclomatic complexity spiked in `process_stream` function.</div>
+</div>
+</div>
+<!-- Center: The Diff Window -->
+<div class="flex-grow bg-surface-container-lowest overflow-y-auto font-mono text-[13px] leading-relaxed relative">
+<!-- Diff Header -->
+<div class="sticky top-0 bg-surface-container-low/90 backdrop-blur-sm p-3 flex justify-between items-center ghost-border z-10">
+<div class="text-on-surface-variant">src/engine/core/processor.rs</div>
+<div class="flex gap-4 text-[11px]">
+<span class="text-error">- 14 lines</span>
+<span class="text-primary-fixed">+ 32 lines</span>
+</div>
+</div>
+<!-- Diff Content -->
+<div class="py-4">
+<!-- Context Line -->
+<div class="flex diff-context hover:bg-surface-container transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">104</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">104</div>
+<div class="px-4 whitespace-pre"> <span class="text-inverse-primary">pub fn</span> <span class="text-secondary">process_stream</span>(data: &amp;[u8]) -&gt; Result&lt;(), EngineError&gt; {</div>
+</div>
+<div class="flex diff-context hover:bg-surface-container transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">105</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">105</div>
+<div class="px-4 whitespace-pre"> <span class="text-inverse-primary">let</span> <span class="text-inverse-primary">mut</span> buffer = Vec::with_capacity(data.len());</div>
+</div>
+<!-- Removed Lines -->
+<div class="flex diff-remove hover:bg-error-container/20 transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">106</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-error/10"></div>
+<div class="px-4 whitespace-pre">-       <span class="text-inverse-primary">for</span> chunk <span class="text-inverse-primary">in</span> data.chunks(1024) {</div>
+</div>
+<div class="flex diff-remove hover:bg-error-container/20 transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">107</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-error/10"></div>
+<div class="px-4 whitespace-pre">-           buffer.extend_from_slice(chunk);</div>
+</div>
+<div class="flex diff-remove hover:bg-error-container/20 transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">108</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-error/10"></div>
+<div class="px-4 whitespace-pre">-           <span class="text-outline-variant">// basic validation</span></div>
+</div>
+<div class="flex diff-remove hover:bg-error-container/20 transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">109</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-error/10"></div>
+<div class="px-4 whitespace-pre">-           <span class="text-inverse-primary">if</span> !validate_chunk(chunk) { <span class="text-inverse-primary">return</span> Err(EngineError::InvalidData); }</div>
+</div>
+<div class="flex diff-remove hover:bg-error-container/20 transition-colors">
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">110</div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-error/10"></div>
+<div class="px-4 whitespace-pre">-       }</div>
+</div>
+<!-- Added Lines -->
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">106</div>
+<div class="px-4 whitespace-pre">+       <span class="text-outline-variant">// Refactored for zero-copy parsing and manual lifetime mgmt</span></div>
+</div>
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">107</div>
+<div class="px-4 whitespace-pre">+       <span class="text-inverse-primary">let</span> ptr = data.as_ptr();</div>
+</div>
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">108</div>
+<div class="px-4 whitespace-pre">+       <span class="text-inverse-primary">let</span> len = data.len();</div>
+</div>
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">109</div>
+<div class="px-4 whitespace-pre">+       </div>
+</div>
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">110</div>
+<div class="px-4 whitespace-pre">+       <span class="text-inverse-primary">unsafe</span> {</div>
+</div>
+<!-- Highlighted added line with a specific flag -->
+<div class="flex diff-add hover:bg-secondary-container/20 transition-colors relative group bg-secondary-container/10">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary-fixed opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-secondary-container/20 text-secondary-fixed-dim"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant text-secondary-fixed-dim">111</div>
+<div class="px-4 whitespace-pre">+           <span class="text-secondary-fixed">std::ptr::copy_nonoverlapping</span>(ptr, buffer.as_mut_ptr(), len);</div>
+</div>
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">112</div>
+<div class="px-4 whitespace-pre">+           buffer.set_len(len);</div>
+</div>
+<div class="flex diff-add hover:bg-primary-container/20 transition-colors relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant bg-primary-container/10"></div>
+<div class="w-12 text-right pr-2 select-none diff-line-num border-r border-outline-variant">113</div>
+<div class="px-4 whitespace-pre">+       }</div>
+</div>
+</div>
+</div>
+<!-- Right Margin: AI-Slop Flags -->
+<div class="w-72 bg-surface-dim p-4 overflow-y-auto flex flex-col gap-4 border-l border-surface-container">
+<h3 class="font-label text-xs text-secondary-fixed-dim uppercase tracking-widest mb-2 border-b border-outline-variant pb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">smart_toy</span>
+                    AI_SLOP_FLAGS
+                </h3>
+<!-- Amber Warning Card -->
+<div class="bg-surface-container-high p-4 relative ghost-border border-l-2 border-l-secondary-container ambient-glow-secondary mt-2">
+<div class="flex items-start justify-between mb-3">
+<span class="bg-secondary-container text-on-secondary-container font-label text-[10px] px-1 py-0.5 uppercase tracking-widest">BOILERPLATE_DETECTED</span>
+<span class="font-mono text-xs text-secondary-fixed">Ln 111</span>
+</div>
+<div class="font-label text-sm text-secondary-fixed uppercase mb-2">Unsafe Copy Block</div>
+<div class="font-body text-[11px] text-on-surface-variant leading-relaxed">
+                        Pattern matches generic LLM optimization suggestion for Rust zero-copy buffering. Lacks surrounding bounds checking usually present in manual implementations.
+                    </div>
+<div class="mt-4 pt-3 border-t border-outline-variant flex justify-between items-center">
+<span class="font-mono text-[10px] text-outline">CONFIDENCE: 94%</span>
+<button class="text-secondary-fixed text-[11px] font-label uppercase hover:text-secondary-fixed-dim transition-colors flex items-center gap-1">
+                            VIEW_SOURCE <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom: Audit Verdict Progress Bar -->
+<div class="bg-surface-container-low h-16 border-t border-outline-variant flex items-center px-6 gap-6 z-20 shrink-0">
+<div class="font-label text-xs text-on-surface-variant uppercase tracking-wider min-w-max">&gt; AUDIT_VERDICT_</div>
+<div class="flex-grow flex flex-col justify-center h-full gap-2">
+<div class="flex justify-between font-mono text-[10px] text-outline">
+<span>SCANNING_NODES</span>
+<span>78% COMPLETE</span>
+</div>
+<div class="h-1 w-full bg-surface-container-highest relative overflow-hidden">
+<!-- Scan line effect -->
+<div class="absolute top-0 left-0 h-full bg-primary-fixed w-[78%]">
+<div class="absolute right-0 top-0 w-10 h-full bg-gradient-to-r from-transparent to-white opacity-50"></div>
+</div>
+</div>
+</div>
+<button class="bg-transparent border border-outline-variant text-on-surface font-label text-xs px-4 py-2 uppercase hover:bg-surface-container-highest transition-colors min-w-max">PAUSE_AUDIT</button>
+</div>
+</div>
+</body></html>
