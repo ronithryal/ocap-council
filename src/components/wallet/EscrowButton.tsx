@@ -1,10 +1,8 @@
 'use client';
 
-// NOTE: EscrowButton V2 settlement UI is parked pending V2 Dashboard rebuild.
-// The Transaction component API in @coinbase/onchainkit v1.x has breaking changes
-// (wagmi v2 integration, `calls` shape, ConnectWallet props). Re-enable once
-// the V2 Cynical Dashboard is built. The current state is intentionally
-// minimal to unblock `npm run dev` for the forensic pipeline demo.
+// NOTE: Escrow settlement is in future roadmap (Phase 3). 
+// Each company handles trial/contract terms differently, so payment flows 
+// are handled directly between employer and candidate.
 
 import { useAccount } from 'wagmi';
 import { Button } from '@/components/ui/button';
@@ -21,13 +19,14 @@ export function EscrowButton({ amount }: EscrowButtonProps) {
   return (
     <div className="flex flex-col gap-2">
       <Button
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl transition-all"
+        className="w-full bg-[#00ff41] hover:bg-[#72ff70] text-[#003907] font-['Space_Grotesk'] font-bold h-12 shadow-[0_0_15px_rgba(0,255,65,0.3)] transition-all active:opacity-50 border-none"
         disabled
+        style={{ borderRadius: '0px' }}
       >
-        {address ? 'Hire & Lock Funds (Gasless)' : 'Connect Wallet to Hire'}
+        {address ? 'HIRE CANDIDATE' : 'CONNECT WALLET TO HIRE'}
       </Button>
-      <p className="text-[10px] text-muted-foreground text-center">
-        Settlement UI — parked until V2 Dashboard rebuild
+      <p className="text-[10px] text-[#84967e] text-center font-mono">
+        On-chain settlement in roadmap (Phase 3)
       </p>
     </div>
   );

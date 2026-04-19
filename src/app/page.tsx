@@ -6,6 +6,7 @@ import { BountyInput } from '@/components/bounty/BountyInput';
 import { HydrationChat } from '@/components/bounty/HydrationChat';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
 import { QuoteCard } from '@/components/settlement/QuoteCard';
+import { Card } from '@/components/ui/card';
 import { AgentPhase, Vendor } from '@/types';
 import { useAccount } from 'wagmi';
 
@@ -40,7 +41,7 @@ export default function Home() {
         body: JSON.stringify({
           description: finalPrompt,
           title: finalPrompt.split('\n')[0].substring(0, 50),
-          budget: 500, // Fallback or extracted from prompt
+          budget: 500,
           category: 'Procurement',
         }),
       });
@@ -100,22 +101,22 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-12 pb-24">
-      {/* 1. Hero / Branding */}
+    <div className="max-w-6xl mx-auto space-y-12 pb-24 font-['Inter']">
+      {/* Hero / Branding */}
       <section className="text-center space-y-4 pt-8">
         <motion.h1 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-6xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-blue-500"
+          className="text-5xl font-['Space_Grotesk'] font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-[#e1e2eb] via-[#e1e2eb] to-[#00ff41]"
         >
           ON-CHAIN AGENTIC PROCUREMENT
         </motion.h1>
-        <p className="text-muted-foreground font-mono tracking-widest text-xs uppercase">
+        <p className="text-[#b9ccb2] font-mono tracking-widest text-xs uppercase">
           Powered by Perplexity Computer Agent · Settled on Base via CDP
         </p>
       </section>
 
-      {/* 2. Main Logic Flow */}
+      {/* Main Logic Flow */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-12 items-start">
           <div className="xl:col-span-12 space-y-12">
             {/* Portal View */}
@@ -150,18 +151,20 @@ export default function Home() {
                    <motion.div 
                     initial={{ opacity: 0 }} 
                     animate={{ opacity: 1 }}
-                    className="h-full min-h-[500px] border border-red-500/20 bg-red-500/5 rounded-3xl flex flex-col items-center justify-center p-12 text-center"
+                    className="h-full min-h-[500px] border border-[#ffb4ab]/20 bg-[#93000a]/5 flex flex-col items-center justify-center p-12 text-center"
+                    style={{ borderRadius: '0px' }}
                    >
-                     <div className="h-20 w-20 rounded-full border border-red-500/20 flex items-center justify-center mb-6">
-                        <span className="text-4xl">⚠</span>
+                     <div className="h-20 w-20 rounded-none border border-[#ffb4ab]/20 flex items-center justify-center mb-6">
+                        <span className="text-4xl text-[#ffb4ab]">!</span>
                      </div>
-                     <h3 className="text-xl font-bold mb-2 text-red-400">Agent Dispatch Failed</h3>
-                     <p className="text-sm text-muted-foreground font-mono max-w-sm mb-6">
+                     <h3 className="text-xl font-['Space_Grotesk'] font-bold mb-2 text-[#ffb4ab]">Agent Dispatch Failed</h3>
+                     <p className="text-sm text-[#b9ccb2] font-mono max-w-sm mb-6">
                        {error || 'An unknown error occurred during the agentic workflow.'}
                      </p>
                      <button 
                        onClick={() => { setPhase('idle'); setError(null); setLogs([]); }}
-                       className="px-6 py-2 bg-white/10 hover:bg-white/20 text-xs font-bold rounded-lg transition-all"
+                       className="px-6 py-2 bg-[#1d2026] hover:bg-[#272a31] text-[#e1e2eb] text-xs font-['Space_Grotesk'] font-bold transition-all border border-[#3b4b37]"
+                       style={{ borderRadius: '0px' }}
                      >
                        TRY AGAIN
                      </button>
@@ -170,13 +173,17 @@ export default function Home() {
                    <motion.div 
                     initial={{ opacity: 0 }} 
                     animate={{ opacity: 1 }}
-                    className="h-full min-h-[500px] border border-white/5 bg-white/5 rounded-3xl flex flex-col items-center justify-center p-12 text-center"
+                    className="h-full min-h-[500px] border border-[#3b4b37]/30 bg-[#191c22] flex flex-col items-center justify-center p-12 text-center relative overflow-hidden"
+                    style={{ borderRadius: '0px' }}
                    >
-                     <div className="h-20 w-20 rounded-full border border-blue-500/20 flex items-center justify-center mb-6">
-                        <div className="h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                     {/* Ambient Glow */}
+                     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(0,255,65,0.1),transparent_70%)] pointer-events-none" />
+                     
+                     <div className="h-20 w-20 rounded-none border border-[#00ff41]/20 flex items-center justify-center mb-6 relative">
+                        <div className="h-10 w-10 border-4 border-[#00ff41] border-t-transparent rounded-none animate-spin" />
                      </div>
-                     <h3 className="text-xl font-bold mb-2">Perplexity Computer Agent Active</h3>
-                     <p className="text-sm text-muted-foreground font-mono max-w-sm">
+                     <h3 className="text-xl font-['Space_Grotesk'] font-bold mb-2 text-[#e1e2eb]">Perplexity Computer Agent Active</h3>
+                     <p className="text-sm text-[#b9ccb2] font-mono max-w-sm relative">
                        The agent is autonomously navigating the web to find, vet, and recommend the best vendor for your requirements. This may take 30-60 seconds.
                      </p>
                    </motion.div>
@@ -187,22 +194,25 @@ export default function Home() {
         )}
       </div>
 
+      {/* Settlement Success Banner */}
       {isSettled && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fixed bottom-12 right-12 glass-card p-6 border-green-500/40 shadow-[0_0_50px_rgba(34,197,94,0.3)] z-[100] max-w-sm"
+          className="fixed bottom-12 right-12 bg-[#191c22] p-6 border border-[#00ff41]/40 shadow-[0_0_50px_rgba(0,255,65,0.3)] z-[100] max-w-sm"
+          style={{ borderRadius: '0px' }}
         >
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
-            <h4 className="font-bold text-green-400 uppercase tracking-tighter">Settlement Successful</h4>
+            <div className="h-3 w-3 rounded-full bg-[#00ff41] animate-pulse"></div>
+            <h4 className="font-['Space_Grotesk'] font-bold text-[#00ff41] uppercase tracking-tighter">Candidate Selected</h4>
           </div>
-          <p className="text-xs text-white/70 font-mono mb-4">
-            USDC Locked in escrow. Vendor notified for mobilization.
+          <p className="text-xs text-[#e1e2eb]/70 font-mono mb-4">
+            Candidate hired. Team notified for onboarding.
           </p>
           <button 
             onClick={() => { setPhase('idle'); setVendor(null); setIsSettled(false); setLogs([]); }}
-            className="w-full py-2 bg-white/10 hover:bg-white/20 text-xs font-bold rounded-lg transition-all"
+            className="w-full py-2 bg-[#1d2026] hover:bg-[#272a31] text-xs font-['Space_Grotesk'] font-bold transition-all border border-[#3b4b37]"
+            style={{ borderRadius: '0px' }}
           >
             DISPATCH NEW AGENT
           </button>

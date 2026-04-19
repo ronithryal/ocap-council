@@ -1,9 +1,9 @@
 /**
- * OCAP V2 Forensic Scorer
+ * OCAP Forensic Scorer
  *
  * Takes a cleaned GitHub diff + developer handle and runs it through
- * Claude 3.5 Sonnet using the "Grit vs Slop" rubric. Returns a structured
- * ForensicScore that a CTO can bet $2k USDC on.
+ * Claude using the "Grit vs Slop" rubric. Returns a structured
+ * ForensicScore that helps CTOs decide whether to hire.
  *
  * This is the opposite of traditional recruiting scoring — we are specifically
  * hunting for signs of AI-slop (generic boilerplate, hallucinated shortcuts,
@@ -34,9 +34,8 @@ interface ScoreInput {
 const RUBRIC = `
 # OCAP FORENSIC SCORING RUBRIC
 
-You are evaluating whether a CTO should spend $2,000 USDC on a 2-week trial
-contract with this engineer. Your job is to be BRUTALLY honest. Most diffs
-are slop. Finding genuine grit is rare.
+You are evaluating whether a CTO should hire this engineer based on their code quality.
+Your job is to be BRUTALLY honest. Most diffs are slop. Finding genuine grit is rare.
 
 ## Scoring Dimensions (each 0-10, integer)
 
@@ -90,9 +89,9 @@ logic — score accordingly. A 10 requires all four dimensions to be strong.
 - **Uncategorized**: Not enough signal in the diff to classify.
 
 ## recommendation
-- **HIRE_FOR_TRIAL**: gritScore >= 8, no critical red flags. Green-light the $2k.
+- **HIRE**: gritScore >= 8, no critical red flags. Strong recommendation to hire.
 - **NEEDS_HUMAN_REVIEW**: gritScore 5-7, or strong dimensions + real concerns.
-  Escalate to a human engineer before committing funds.
+  Escalate to a human engineer before making a decision.
 - **DO_NOT_HIRE**: gritScore <= 4, or clear AI-slop patterns, or critical
   red flags (leaks, unsafe code, obvious bugs shipped).
 
@@ -205,7 +204,7 @@ const SCORE_TOOL_SCHEMA = {
       },
       recommendation: {
         type: 'string',
-        enum: ['HIRE_FOR_TRIAL', 'NEEDS_HUMAN_REVIEW', 'DO_NOT_HIRE'],
+        enum: ['HIRE', 'NEEDS_HUMAN_REVIEW', 'DO_NOT_HIRE'],
       },
     },
   },

@@ -49,7 +49,7 @@ An agentic engine that uses "The Principal" model (Hermes-3) to audit automated 
 
 ### 5. The "Audited Settlement" Moat (2026 Strategy)
 *   **The Conflict:** Simple search engines and general marketplaces (Fiverr/Upwork) are failing due to "Trust Decay" (AI-generated garbage and fake reviews).
-*   **The Moat:** OCAP’s value is **Audited Settlement.** We don't just "find" humans; we provide an **Autonomous Procurement Ledger.** 
+*   **The Moat:** OCAP's value is **Audited Settlement.** We don't just "find" humans; we provide an **Autonomous Procurement Ledger.** 
     *   **Phase 1:** Agentic Vetting (Truth over Ratings).
     *   **Phase 2:** Escrow Funding (Instant Mobilization).
     *   **Phase 3:** Autonomous Verification (PoD Audit).
@@ -75,9 +75,9 @@ To satisfy the competition's requirement for a fully autonomous company, we cann
 
 ### 9. OCAP V2: The Forensic Engineering Pivot
 *   **The Pivot:** We are abandoning the "Yellow Pages" model (generalized routing for home services, craftwork, physical goods). Trying to compete in the "Gig" or "Lead Gen" market traps the product in low-margin, high-friction operational nightmares. Plus, the likes of Craftwork and Angi are already doing this.
-*   **The "AI-Slop" Crisis:** In 2026, the real problem CTOs face is not finding *a* developer, but finding the 1% who possess deep architectural "Grit." The market is flooded with engineers generating unvetted, generic boilerplate using LLMs (AI-slop).
+*   **The "AI-Slop" Crisis:** In 2026, the real problem CTOs faces is not finding *a* developer, but finding the 1% who possess deep architectural "Grit." The market is flooded with engineers generating unvetted, generic boilerplate using LLMs (AI-slop).
 *   **The V2 Moat (Forensic Behavioral Engine):** OCAP is now a **High-Precision Talent Weapon**. We no longer match via generic keywords. We use Perplexity to hunt for specific behavioral markers on GitHub (e.g., fixing race conditions, high-complexity refactoring) and run candidates through a **Semantic Feature Store**.
-*   **Recursive Learning Loop:** We evaluate candidates' raw `.diff` files against a database of "God-Tier" code. By dynamically ingesting new high-scoring PRs when a CTO bets money on a candidate (via a $2k USDC Trial Contract), our autonomous vetting logic physically evolves, ensuring OCAP's definitions of "Good Code" constantly outpace the rise of AI-generated noise.
+*   **Recursive Learning Loop:** We evaluate candidates' raw `.diff` files against a database of "God-Tier" code. By dynamically ingesting new high-scoring PRs when a CTO hires a candidate, our autonomous vetting logic physically evolves, ensuring OCAP's definitions of "Good Code" constantly outpace the rise of AI-generated noise.
 
 ---
 
@@ -92,12 +92,46 @@ The `/forensic-demo` prototype shows CTOs exactly what they get when they use OC
 | Star ratings (easily gamed) | 4-Dimension breakdown (Edge Case Density, Architectural Intent, Code Fingerprint, Testing Rigor) |
 | Vague "references available" | Grit Markers — specific file paths + code patterns that prove depth |
 | "Great culture fit" | Red Flags — AI-slop patterns, happy-path-only tests |
-| "Let me check their LinkedIn" | CTO Justification — plain-language explanation of why to spend or skip the $2k |
+| "Let me check their LinkedIn" | CTO Justification — plain-language explanation of why to hire or skip |
 
 ### Why This Wins for CTOs
 The dashboard speaks their language: code, not claims. Every metric is derived from a **raw `.diff`** file — not a profile, not a resume. A CTO can click the `smoking_gun_url` and independently audit the PR that justified the score. This is **Traceable Intelligence** — the foundation of OCAP's trust moat.
 
 ### What's Next (Roadmap)
 1. **Seed the Forensic Code Library:** Ingest ~50 Gold Standard PRs from `solana-labs/solana` and `ethereum/go-ethereum` into pgvector. This enables similarity-matched scoring (not just isolated scoring) so the rubric calibrates itself over time.
-2. **Re-enable Settlement UI:** Once the V2 Dashboard is fully wired, rebuild `EscrowButton.tsx` with the correct OnchainKit v1.x API to enable the `$2,000 USDC HIRE FOR TRIAL` transaction via CDP Paymaster.
+2. **Re-enable Settlement UI (Phase 3):** On-chain escrow is moved to future roadmap. Each company handles trial/contract terms differently. Payment flows will be handled directly between employer and candidate.
 3. **Full V2 Product UI:** Integrate the `ForensicDashboard` into the main `/` flow — after the Perplexity Hunter returns a `developerHandle` + `smokingGunUrl`, the dashboard auto-renders the report before the CTO decides to hire.
+
+---
+
+## [2026-04-18] Sourcing Agent Quality Gates — Stopping the Slop at the Source
+
+### The Problem: Quality Leakage
+Early calibration runs exposed a critical flaw: the Perplexity "Hunter" was surfacing candidates with 1/10 Grit Scores (like a 1-word typo fix in `golang/go`). This creates a bad experience for CTOs who see the dashboard cluttered with "DO NOT HIRE" recommendations — wasting their time and eroding trust in the system.
+
+### The Solution: Pre-Sourcing Quality Gates
+We upgraded the Hunter to be a "Pre-Vetting Orchestrator" rather than a keyword-matcher. The new system enforces:
+
+**Negative Filters (Auto-Reject):**
+- One-word typo fixes, documentation changes, formatting commits
+- Bot-generated dependency updates
+- Single-line comment or string changes
+
+**Positive Complexity Requirements (3 of 5):**
+- 3+ files changed across different subsystems
+- 50+ lines of non-trivial logic
+- State/Concurrency impact (mutexes, channels, state machines)
+- Edge Case Handling (malformed input, error recovery)
+- Technical Depth (language-specific primitives)
+
+**Internal Mini-Audit:**
+Before surfacing any "Smoking Gun" URL, the Hunter must internally answer:
+1. What specific technical problem does this PR solve?
+2. Would a senior engineer recognize this as non-trivial?
+3. Does this PR show understanding of broader system architecture?
+4. Would a CTO want to hire this candidate?
+
+### Impact on Product
+- **Dashboard Quality:** CTOs now see 8/10 and 9/10 candidates by default, not "DO NOT HIRE" noise.
+- **Trust Moat Reinforcement:** The pre-vetting layer ensures OCAP is the only system in 2026 that filters out AI-slop *before* it reaches the dashboard.
+- **Next Unlock:** Once the Forensic Code Library (pgvector) is seeded with ~50 Gold Standard PRs, the system can compare new candidates against "God-Tier" benchmarks, making the quality gates even tighter over time.

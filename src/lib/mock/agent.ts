@@ -28,7 +28,7 @@ export async function simulateAgentWorkflow(
     { phase: 'navigating', message: 'Navigating professional networks and discovery portals (Sonar-Pro)...', delay: 3000 },
     { phase: 'vetting', message: 'Vetting credentials against 5-year experience requirement. Comparing portfolios.', delay: 4000 },
     { phase: 'awaiting_quote', message: 'Requesting binding quotes via 2026 decentralized vendor oracle...', delay: 3000 },
-    { phase: 'quote_received', message: 'Vetted candidate identified. Generating summary and deposit escrow link.', delay: 2000 },
+    { phase: 'quote_received', message: 'Vetted candidate identified. Generating summary and contact details.', delay: 2000 },
   ];
 
   for (const step of steps) {

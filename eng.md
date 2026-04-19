@@ -108,4 +108,36 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 - **Forensic Code Library (pgvector):** Still empty. Diligence currently scores in isolation. Next unlock is similarity search against ~50 seeded Gold Standard PRs.
 - **Settlement UI:** `EscrowButton.tsx` intentionally parked — OnchainKit v1.x has breaking API changes with wagmi v2 (`calls` shape, `ConnectWallet` props). Re-enable once V2 Dashboard is fully built.
 
+### 14. Sourcing Agent Quality Gates Upgrade
 
+**Problem:** The Perplexity "Hunter" was too loose—it surfaced ANY candidate matching a keyword, even trivial typo fixes (like `golang/go#78798`). This wastes CTO time with 1/10 "slop" candidates on the dashboard.
+
+**Solution:** Upgraded `hydrateBrockmanPrompt()` in `src/lib/perplexity.ts` with strict Pre-Sourcing Quality Gates:
+
+**Negative Search Patterns (Auto-Reject):**
+- One-word typo fixes in error messages or panic strings
+- README, CHANGELOG, or documentation-only changes
+- Formatting changes (go fmt, rustfmt, prettier, eslint --fix)
+- .gitignore, license files, or config defaults
+- Bot "Apply suggestions" or dependency updates
+- Test-only changes without production logic modification
+- Single-line string changes or comment updates
+
+**Positive Complexity Heuristics (Must-Have 3 of 5):**
+- Architectural Scope: 3+ files across different directories/subsystems
+- Logic Density: 50+ lines of non-trivial logic (no auto-generated)
+- State/Concurrency Impact: mutexes, channels, state machines
+- Edge Case Handling: malformed input, boundary conditions, error recovery
+- Technical Depth: language-specific primitives (Go interfaces, Rust lifetimes, etc.)
+
+**Internal Mini-Audit (4 Required Questions):**
+1. What specific technical problem does this PR solve?
+2. Would a senior engineer recognize this as non-trivial?
+3. Does this PR show understanding of broader system architecture?
+4. Would this PR pass the "CTO Test" — would a CTO pay $2k to trial this candidate?
+
+**Enhanced Return Schema:**
+- Added `grit_hypothesis` field: Agent states why this PR passes quality gates
+- Added `rejectedCandidates` array: Documents rejected candidates and reasons
+
+**Result:** The Sourcing Agent is now a "Pre-Vetting Orchestrator." It surfaces only candidates with significant architectural impact, ensuring the Forensic Scorer receives high-quality inputs and the CTO dashboard shows 8/10 and 9/10 candidates by default.

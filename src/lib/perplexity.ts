@@ -20,6 +20,36 @@ You are the OCAP Council Forensic Hunter. Your mission is to find the top 1% of 
 
 We are NOT looking for generic developers. We are hunting for "Grit Fingerprints" on GitHub. You must utilize agentic search strategies to find behavioral markers (e.g., fixing mature race conditions, complex memory optimizations, or 'spaghetti' logic refactoring).
 
+## PRE-SOURCING QUALITY GATES (CRITICAL)
+Before you recommend ANY candidate, you MUST apply these filters. If a candidate fails ANY gate, REJECT them and keep searching.
+
+### Negative Search Patterns (Auto-Reject)
+AVOID these types of contributions — they are "AI-slop" or trivial noise, NOT grit:
+- One-word typo fixes in error messages or panic strings
+- README, CHANGELOG, or documentation-only changes
+- Formatting changes (go fmt, rustfmt, prettier, eslint --fix)
+- Adding or updating .gitignore, license files, or config defaults
+- "Apply suggestions" from bots or dependency updates
+- Test-only changes that don't modify production logic
+- Single-line string changes or comment updates
+
+### Positive Complexity Heuristics (Must-Have)
+The ideal candidate's PR MUST exhibit at least 3 of these 5 markers:
+1. **Architectural Scope:** Changes to 3+ files across different directories/subsystems
+2. **Logic Density:** 50+ lines of non-trivial logic (no auto-generated code)
+3. **State/Concurrency Impact:** Modifies shared state, mutexes, channels, or state machines
+4. **Edge Case Handling:** Addresses malformed input, boundary conditions, or error recovery paths
+5. **Technical Depth:** Uses language-specific primitives (Go interfaces, Rust lifetimes, C++ templates, Solidity assembly)
+
+### Internal Mini-Audit (Required Step)
+For EACH candidate you consider, BEFORE selecting the "Smoking Gun", you must internally answer:
+1. What specific technical problem does this PR solve?
+2. Would a senior engineer recognize this as non-trivial?
+3. Does this PR show understanding of the broader system architecture?
+4. Would this PR pass the "CTO Test" — would a CTO want to hire this candidate?
+
+If you cannot confidently answer YES to all 4 questions, REJECT the candidate.
+
 ## TECHNICAL VETTING (THE ARCHETYPES)
 Your search must categorize candidates into one of these archetypes based on their raw code history:
 1. **Concurrency Masters:** (Search for PRs fixing memory leaks, race conditions, using mutexes in Rust, C++, Go).
@@ -35,6 +65,7 @@ For the 'smoking_gun_url', DO NOT attempt to write the actual URL string. Instea
     "developer_handle": "GitHub Username",
     "archetype_label": "Concurrency Master | State Architect | Chaos Engineer",
     "smoking_gun_url": "[1]",
+    "grit_hypothesis": "Why this PR passes the Pre-Sourcing Quality Gates (cite specific technical markers)",
     "summary": "Deep forensic technical justification summarizing why this specific PR proves their grit and avoids AI-slop."
   },
   "alternativeCandidates": [
@@ -42,10 +73,18 @@ For the 'smoking_gun_url', DO NOT attempt to write the actual URL string. Instea
       "developer_handle": "...",
       "archetype_label": "...",
       "smoking_gun_url": "[2]",
+      "grit_hypothesis": "...",
       "summary": "..."
     }
   ],
-  "searchSummary": "Brief description of the behavioral keywords and filters used during your forensic search."
+  "searchSummary": "Brief description of the behavioral keywords and filters used during your forensic search.",
+  "rejectedCandidates": [
+    {
+      "developer_handle": "...",
+      "smoking_gun_url": "...",
+      "rejectionReason": "Why this candidate was rejected (e.g., 'Single-line typo fix in error message')"
+    }
+  ]
 }
 
 ## WARNINGS
@@ -53,9 +92,10 @@ For the 'smoking_gun_url', DO NOT attempt to write the actual URL string. Instea
 - The 'smoking_gun_url' MUST be a link to a specific GitHub Pull Request or Commit, NOT a user profile.
 - You must ONLY return raw JSON. Do not include conversational text or markdown blocks like \`\`\`json.
 - Do NOT base recommendations on social followers or stars. Rely solely on the technical depth of their commits.
+- NEVER surface a candidate who just fixed a typo or updated docs. We would rather return NO candidates than waste the CTO's time with noise.
 
 ## CONTEXT
-This output will be fed directly into OCAP's V2 Forensic Labeler which pulls the raw .diff file of the smoking_gun_url for semantic evaluation. The atomic trial unit is a $2k USDC contract.
+This output will be fed directly into OCAP's Forensic Labeler which pulls the raw .diff file of the smoking_gun_url for semantic evaluation. Pricing and trial terms are handled directly between employer and candidate.
 Bounty ID: ${task.bountyId}
 ---
 `.trim();
@@ -68,7 +108,8 @@ Bounty ID: ${task.bountyId}
 function parseVendorFromResponse(
   content: string, 
   bountyId: string, 
-  searchResults: any[] = []
+  searchResults: any[] = [],
+  defaultBudget: number = 500
 ): {
   selectedVendor: Partial<Vendor>;
   alternativeVendors: Partial<Vendor>[];
@@ -114,7 +155,7 @@ function parseVendorFromResponse(
         bountyId,
         name: parsed.selectedCandidate?.developer_handle || 'Unknown Developer',
         credentials: parsed.selectedCandidate?.archetype_label || 'Uncategorized Grit',
-        quoteAmount: 2000, // Fixed $2k Trial Contract (V2 Atomic Unit)
+        quoteAmount: defaultBudget, // Flexible rate based on task budget
         githubUrl: resolveCitation(parsed.selectedCandidate?.smoking_gun_url),
         summary: parsed.selectedCandidate?.summary || '',
         isVerified: true,
@@ -123,7 +164,7 @@ function parseVendorFromResponse(
         bountyId,
         name: v.developer_handle,
         credentials: v.archetype_label,
-        quoteAmount: 2000, // Fixed $2k Trial Contract
+        quoteAmount: defaultBudget,
         githubUrl: resolveCitation(v.smoking_gun_url),
         summary: v.summary,
         isVerified: false,
@@ -173,7 +214,7 @@ export async function dispatchPerplexityAgent(task: PerplexityTaskRequest): Prom
       body: JSON.stringify({
       preset: 'pro-search',
       input: prompt,
-      instructions: "You are the autonomous OCAP Council Procurement Agent. Follow the GOAL, TECHNICAL VETTING, RETURN FORMAT, and WARNINGS exactly. Output valid, parseable JSON and nothing else.",
+      instructions: "You are the autonomous OCAP Council Procurement Agent. Follow the GOAL, PRE-SOURCING QUALITY GATES, TECHNICAL VETTING, RETURN FORMAT, and WARNINGS exactly. Output valid, parseable JSON and nothing else.",
       tools: [{ type: "web_search" }],
     }),
   });
@@ -198,7 +239,7 @@ export async function dispatchPerplexityAgent(task: PerplexityTaskRequest): Prom
     throw new Error('Empty or misconfigured response from Perplexity Agent API');
   }
 
-  return parseVendorFromResponse(content, task.bountyId, searchResults);
+  return parseVendorFromResponse(content, task.bountyId, searchResults, task.maxBudget || 500);
 }
 
 /**

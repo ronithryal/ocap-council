@@ -6,6 +6,9 @@
   --font-sans: var(--font-inter);
   --font-mono: var(--font-roboto-mono);
 
+  --font-headline: "Space Grotesk", sans-serif;
+  --font-label: "Space Grotesk", sans-serif;
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -33,9 +36,38 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
 
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  /* GritHunter Forensic Design Tokens */
+  --color-primary-container: #00ff41;
+  --color-primary-fixed: #72ff70;
+  --color-primary-fixed-dim: #00e639;
+  --color-on-primary-container: #007117;
+  --color-on-primary: #003907;
+
+  --color-secondary-container: #feb700;
+  --color-secondary-fixed: #ffdea8;
+  --color-secondary-fixed-dim: #ffba20;
+  --color-on-secondary-container: #6b4b00;
+
+  --color-surface-container-lowest: #0b0e14;
+  --color-surface-dim: #10131a;
+  --color-surface-container-low: #191c22;
+  --color-surface-container: #1d2026;
+  --color-surface-container-high: #272a31;
+  --color-surface-container-highest: #32353c;
+
+  --color-outline: #84967e;
+  --color-outline-variant: #3b4b37;
+  --color-on-surface: #e1e2eb;
+  --color-on-surface-variant: #b9ccb2;
+
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+
+  --radius-lg: 0px;
+  --radius-md: 0px;
+  --radius-sm: 0px;
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
@@ -65,72 +97,167 @@
 }
 
 /*
-  The default border color has changed to `border-slate-200` (referenced as `border`)
-  in Tailwind CSS v4, so we've redeclared it here to maintain compatibility.
+  GritHunter Forensic Console Design System
+  Based on "The Forensic Console" aesthetic - cold, high-stakes precision for power users.
 */
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --radius: 0.5rem;
+    --background: #0b0e14;
+    --foreground: #e1e2eb;
+    --card: #191c22;
+    --card-foreground: #e1e2eb;
+    --popover: #191c22;
+    --popover-foreground: #e1e2eb;
+    --primary: #ebffe2;
+    --primary-foreground: #003907;
+    --secondary: #ffdb9d;
+    --secondary-foreground: #412d00;
+    --muted: #272a31;
+    --muted-foreground: #b9ccb2;
+    --accent: #32353c;
+    --accent-foreground: #e1e2eb;
+    --destructive: #ffb4ab;
+    --destructive-foreground: #690005;
+    --border: #3b4b37;
+    --input: #3b4b37;
+    --ring: #00ff41;
+    --radius: 0px;
   }
-}
 
-@layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background-image: 
-      radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+    background-color: #0b0e14;
+    font-family: 'Inter', sans-serif;
   }
 }
 
-/* Custom "Agentic Terminal" Utilities */
+/* Forensic Console Custom Utilities */
 @layer components {
-  .glass-card {
-    @apply bg-card/50 backdrop-blur-md border border-white/10 shadow-xl;
+  /* Ghost Border - subtle structural hint without cluttering visuals */
+  .ghost-border {
+    border: 1px solid rgba(132, 150, 126, 0.2);
   }
-  
+
+  /* Glass Panel with forensic aesthetic */
+  .glass-panel {
+    backdrop-filter: blur(12px);
+    background-color: rgba(50, 53, 60, 0.8);
+  }
+
+  /* Grit Green Glow Effects */
+  .glow-sm {
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+  }
+  .glow-md {
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.2);
+  }
+  .glow-lg {
+    box-shadow: 0 0 32px rgba(0, 230, 57, 0.1);
+  }
+
+  /* Amber Warning Glow */
+  .glow-secondary {
+    box-shadow: 0 0 32px rgba(254, 183, 0, 0.1);
+  }
+
+  /* Glass Card - forensic surface with subtle depth */
+  .glass-card {
+    @apply bg-surface-container-low backdrop-blur-md;
+    background-color: rgba(25, 28, 34, 0.8);
+    border: 1px solid rgba(59, 75, 55, 0.2);
+  }
+
+  /* Terminal Text */
   .terminal-text {
     @apply font-mono text-sm tracking-tight;
+    font-family: 'JetBrains Mono', monospace;
   }
 
-  .glow-border {
+  /* Surgical Hover - precise interaction feedback */
+  .surgical-hover {
     position: relative;
   }
-
-  .glow-border::after {
+  .surgical-hover:hover {
+    background-color: rgba(0, 255, 65, 0.05);
+  }
+  .surgical-hover:hover::before {
     content: '';
     position: absolute;
-    inset: -1px;
-    background: linear-gradient(45deg, #00dc82, #36e4da, #0047e1);
-    z-index: -1;
-    filter: blur(5px);
-    opacity: 0.3;
-    @apply rounded-[inherit] transition-opacity duration-500;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: #72ff70;
+    box-shadow: 0 0 4px rgba(0, 255, 65, 0.5);
   }
 
-  .glow-border:hover::after {
-    opacity: 0.6;
+  /* Technical Trace - row-level interaction indicator */
+  .technical-trace {
+    position: relative;
+  }
+  .technical-trace:hover::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: #72ff70;
+  }
+
+  /* Grit Marker - positive signal */
+  .grit-marker {
+    @apply bg-primary-container/10 border border-primary-container/30;
+  }
+
+  /* AI-Slop Flag - warning indicator */
+  .slop-flag {
+    @apply bg-secondary-container/10 border border-secondary-container/30;
+  }
+
+  /* Scan Line Animation (subtle terminal effect) */
+  .scan-line {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #00FF41;
+    opacity: 0.3;
+    box-shadow: 0 0 8px #00FF41;
+  }
+
+  /* Diff Colors */
+  .diff-add {
+    background-color: rgba(0, 255, 65, 0.05);
+    color: #00FF41;
+  }
+  .diff-remove {
+    background-color: rgba(255, 180, 171, 0.05);
+    color: #ffb4ab;
+  }
+  .diff-context {
+    color: #b9ccb2;
+  }
+  .diff-line-num {
+    color: #3b4b37;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0b0e14;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3b4b37;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #00ff41;
   }
 }
