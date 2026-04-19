@@ -1,6 +1,6 @@
 # OCAP Council - Project Plan
 
-> **Last Updated:** April 19, 2026
+> **Last Updated:** April 19, 2026 — 03:05 AM
 
 ## Overview
 OCAP Council is a Forensic Behavioral Intelligence platform that hunts for elite technical talent ("Grit") using the Perplexity Agent API (`v1/agent`) for live web research and Claude 3.5 Sonnet for forensic code diff scoring. The UI is a full-bleed FORENSIC_OS design system with 4 views: Architect, Hunting, Audit, Diligence.
@@ -32,37 +32,32 @@ OCAP Council is a Forensic Behavioral Intelligence platform that hunts for elite
 
 - [ ] **Diligence 404 on old bounties** — bounties created before the vendor-id fix (`bd68e87`) will still 404 on diligence. New dispatches are correct.
 - [ ] **Perplexity `v1/agent` endpoint** — needs validation that `preset: "pro-search"` and `tools: [{ type: "web_search" }]` are the correct field names for the current API version. If the agent returns a non-200, check `eng.md` for the latest schema.
-- [ ] **HydrationChat** — the Brockman Formula hydration flow is wired but the telemetry panel (Clarity Score, Constraint Density, Ambiguity Index) is still static mock data. Should update in real-time as the user types/answers questions.
+- [x] **HydrationChat telemetry** — resolved via `computeTelemetry()` heuristic + `onDescriptionChange` prop on `BountyInput`. Clarity, Constraint Density, Ambiguity Index all update live as user types. Commit `91b7c39`.
 
 ## Next Steps
 
-### Immediate (P0)
-- [ ] **Wire Prompt Telemetry to live state** — `clarity`, `constraint`, `ambiguity` scores in the right panel of the Architect page should update as the user types their bounty description (can use a lightweight heuristic: word count, question marks, technical keyword density)
-- [ ] **Session Map persistence** — save completed bounty sessions to Supabase and render them in the left panel of the Architect page (currently hardcoded mock data)
-- [ ] **Hunting page live data** — replace mock log entries with real `agent_logs` rows from Supabase (poll or subscribe via Supabase Realtime) for the active bounty
-- [ ] **Audit page diff viewer** — when a real `engineer_report` is selected from the left panel, fetch the actual GitHub diff via `/api/bounty/[id]/diligence` and render it in the center diff viewer (currently always shows the mock Rust diff)
+### ✅ Done (P0 — April 19, 2026)
+- [x] Wire Prompt Telemetry to live state (`computeTelemetry()` heuristic, `onDescriptionChange` prop) — `91b7c39`
+- [x] Session Map loads from Supabase `bounties` table — `91b7c39`
+- [x] Hunting page wired to Supabase Realtime `agent_logs` — `91b7c39`
 
-### Short-term (P1)
-- [ ] **Supabase Realtime on agent_logs** — replace the polling pattern in AgentTracker with a Supabase channel subscription so phase transitions appear live without page refresh
-- [ ] **Alternative candidates (multi-option view)** — the dispatch route already returns `alternativeCount` and `alternativeVendors` from Perplexity, but the frontend currently discards them. The user should be able to see all returned candidates side-by-side (primary + alternatives), compare their archetypes and smoking-gun PRs, and choose which one to run forensic analysis on. Surface as a ranked candidate list / card grid below the primary QuoteCard in the Architect view, with a "Run Forensic Analysis" CTA on each card. The selected candidate's `id` is then passed to the diligence pipeline.
-- [ ] **Diligence page live data** — `/diligence` currently shows mock data. Wire it to the most recent `engineer_report` from Supabase for the active bounty, or accept a `?reportId=` query param
-- [ ] **Error recovery** — if the Perplexity agent returns a non-JSON response (hallucinated markdown, rate limit, etc.), the fallback vendor object should be surfaced more gracefully in the UI with a "Raw Agent Output" expandable section
+### 🔴 Now (P1 — Next Session)
+- [ ] **Audit diff viewer — wire to real GitHub diff** — when a report is selected in the left panel, call `fetchCleanDiff(report.smoking_gun_url)` via a new `GET /api/bounty/diff?url=` route and render the real diff in the center viewer. Replace the hardcoded Rust mock entirely.
+- [ ] **Alternative candidates (multi-option view)** — surface `alternativeVendors` from the dispatch response as a ranked card grid below the primary QuoteCard. Each card has a "Run Forensic Analysis" CTA. The selected card's vendor `id` is passed to the diligence pipeline. This is the "Council" metaphor — agent presents a shortlist, CTO picks.
+- [ ] **Diligence page live data** — accept `?reportId=` query param, fetch from `engineer_reports`, render real grit score, competencies (from `dimensions` JSONB), evidence (from `grit_markers` JSONB), and terminal log from `agent_logs`.
+- [ ] **Supabase Realtime on AgentTracker** — replace the prop-passed `logs[]` pattern with a live Supabase channel subscription on `agent_logs` filtered by `bounty_id`, so the tracker updates without needing the parent to poll.
 
-### Medium-term (P2)
-- [ ] **Hunting page node map** — replace the static SVG nodes with a real graph of GitHub repos/users discovered during the agent run (pull from `agent_logs.metadata`)
-- [ ] **Multi-bounty dashboard** — a list view of all bounties with their current `agent_phase` status, accessible from the Session Map
-- [ ] **Candidate profile page** — a dedicated route `/candidate/[handle]` that shows the full forensic report, diff viewer, and hire/pass CTA
+### 🟡 Soon (P2)
+- [ ] **Error recovery UI** — if Perplexity returns non-JSON (rate limit, hallucinated markdown), surface a "Raw Agent Output" expandable section in the Architect view instead of a generic error state.
+- [ ] **Hunting page node map** — replace static `<div>` nodes with a real graph of GitHub repos/users from `agent_logs.metadata` (keptFiles, developerHandle, smokingGunUrl).
+- [ ] **Multi-bounty dashboard** — list view of all bounties with `agent_phase` status badges, accessible from the Session Map left panel.
+- [ ] **Candidate profile page** — `/candidate/[handle]` route showing full forensic report, diff viewer, and hire/pass CTA.
 
-### Phase 4: Settlement (Deprioritized / Future)
-- [ ] On-chain escrow via Base/CDP
-- [ ] USDC payment flows
-- [ ] Multi-party settlement logic
-- [ ] Vendor mobilization tracking
-
-### Phase 5: Scale (Future)
+### 🔵 Future (P3+)
+- [ ] On-chain escrow via Base/CDP (USDC payment flows, multi-party settlement)
+- [ ] Forensic Code Library (pgvector) — seed ~50 Gold Standard PRs for similarity-matched scoring
 - [ ] Multi-category support (video, legal, marketing, etc.)
-- [ ] Vendor reputation oracle
-- [ ] Dispute resolution
+- [ ] Vendor reputation oracle + dispute resolution
 
 ## Architecture Notes
 

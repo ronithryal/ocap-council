@@ -62,9 +62,8 @@ export default function HuntingPage() {
       .then(({ data }) => {
         if (data && data.length > 0) {
           setBounties(data);
-          // Auto-select the most recent active bounty
-          const active = data.find(b => b.agent_phase && b.agent_phase !== 'idle' && b.agent_phase !== 'quote_received');
-          setActiveBountyId(active?.id ?? data[0].id);
+          // Auto-select the most recent bounty (any phase)
+          setActiveBountyId(data[0].id);
         }
         setLoading(false);
       });

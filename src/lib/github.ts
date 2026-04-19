@@ -10,6 +10,7 @@ const GITHUB_API_BASE = 'https://api.github.com';
 export type ParsedGitHubUrl =
   | { kind: 'pull'; owner: string; repo: string; number: number }
   | { kind: 'commit'; owner: string; repo: string; sha: string }
+  | { kind: 'repo'; owner: string; repo: string }
   | { kind: 'unknown'; raw: string };
 
 /**
@@ -18,6 +19,7 @@ export type ParsedGitHubUrl =
  * Supports:
  *   - https://github.com/{owner}/{repo}/pull/{number}
  *   - https://github.com/{owner}/{repo}/commit/{sha}
+ *   - https://github.com/{owner}/{repo}  (repo root — will use latest commit)
  */
 export function parseGitHubUrl(url: string): ParsedGitHubUrl {
   try {
@@ -27,7 +29,6 @@ export function parseGitHubUrl(url: string): ParsedGitHubUrl {
     }
 
     const parts = u.pathname.split('/').filter(Boolean);
-    // [owner, repo, type, id]
     if (parts.length >= 4) {
       const [owner, repo, type, id] = parts;
       if (type === 'pull') {
@@ -37,6 +38,10 @@ export function parseGitHubUrl(url: string): ParsedGitHubUrl {
       if (type === 'commit') {
         return { kind: 'commit', owner, repo, sha: id };
       }
+    }
+    // Repo root URL: github.com/{owner}/{repo}
+    if (parts.length === 2) {
+      return { kind: 'repo', owner: parts[0], repo: parts[1] };
     }
     return { kind: 'unknown', raw: url };
   } catch {
@@ -60,13 +65,6 @@ export async function fetchGitHubDiff(url: string): Promise<{
     throw new Error(`Unrecognized GitHub URL: ${url}`);
   }
 
-  let apiUrl: string;
-  if (parsed.kind === 'pull') {
-    apiUrl = `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}/pulls/${parsed.number}`;
-  } else {
-    apiUrl = `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}/commits/${parsed.sha}`;
-  }
-
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github.v3.diff',
     'User-Agent': 'OCAP-Council-Forensic-Engine/1.0',
@@ -75,6 +73,32 @@ export async function fetchGitHubDiff(url: string): Promise<{
   const token = process.env.GITHUB_API_TOKEN;
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+
+  // For repo root URLs, resolve to the latest commit SHA first
+  let resolvedParsed = parsed;
+  if (parsed.kind === 'repo') {
+    const commitsRes = await fetch(
+      `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}/commits?per_page=1`,
+      { headers: { ...headers, Accept: 'application/vnd.github.v3+json' } }
+    );
+    if (!commitsRes.ok) {
+      throw new Error(`Could not fetch commits for repo ${parsed.owner}/${parsed.repo}: ${commitsRes.status}`);
+    }
+    const commits = await commitsRes.json();
+    if (!commits?.[0]?.sha) {
+      throw new Error(`No commits found in repo ${parsed.owner}/${parsed.repo}`);
+    }
+    resolvedParsed = { kind: 'commit', owner: parsed.owner, repo: parsed.repo, sha: commits[0].sha };
+  }
+
+  let apiUrl: string;
+  if (resolvedParsed.kind === 'pull') {
+    apiUrl = `${GITHUB_API_BASE}/repos/${resolvedParsed.owner}/${resolvedParsed.repo}/pulls/${resolvedParsed.number}`;
+  } else if (resolvedParsed.kind === 'commit') {
+    apiUrl = `${GITHUB_API_BASE}/repos/${resolvedParsed.owner}/${resolvedParsed.repo}/commits/${resolvedParsed.sha}`;
+  } else {
+    throw new Error(`Cannot fetch diff for URL kind: ${(resolvedParsed as any).kind}`);
   }
 
   const response = await fetch(apiUrl, { headers });
