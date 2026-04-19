@@ -138,6 +138,38 @@ Before surfacing any "Smoking Gun" URL, the Hunter must internally answer:
 
 ---
 
+## [2026-04-19] FORENSIC_OS UI Rebuild & Multi-Option Candidate View
+
+### FORENSIC_OS Design System
+The full product UI has been rebuilt to match the FORENSIC_OS design mockups. The platform now presents as a forensic intelligence terminal rather than a generic SaaS dashboard. Key design decisions:
+
+- **Zero border-radius everywhere** — sharp edges signal precision and authority
+- **`#00ff41` green** — the "signal found" color; used for active states, hits, and hire recommendations
+- **`#feb700` amber** — the "warning/review" color; used for AI slop flags and manual review states
+- **`Space Grotesk` headings** — technical authority without being cold
+- **Monospace labels** — all metadata, timestamps, and system labels use `JetBrains Mono`
+
+### 4-View Navigation
+The product now has 4 distinct views, each serving a different stage of the hiring workflow:
+
+| View | Purpose | Status |
+|---|---|---|
+| **ARCHITECT** (`/`) | Prompt hydration → agent dispatch → candidate review | Live (core flow) |
+| **HUNTING** (`/hunting`) | Live interrogation log during agent run | Mock (to be wired) |
+| **AUDIT** (`/audit`) | Diff viewer + AI slop flag analysis | Partially live |
+| **DILIGENCE** (`/diligence`) | Full forensic report: grit score, competencies, evidence | Mock (to be wired) |
+
+### Multi-Option Candidate View (Planned)
+The Perplexity agent already returns multiple candidates (`selectedCandidate` + `alternativeCandidates`), but the frontend currently discards the alternatives. The next product milestone is surfacing all candidates side-by-side so the CTO can:
+1. See the primary recommendation + 2–3 alternatives ranked by archetype
+2. Compare their smoking-gun PRs and grit hypotheses
+3. Choose which candidate to run the full forensic analysis on
+4. The selected candidate's DB UUID is then passed to the diligence pipeline
+
+This is the "Council" metaphor made real — the agent presents a shortlist, the CTO makes the final call.
+
+---
+
 ## [2026-04-19] Enum Cleanup, $2k Removal & Audit History Live
 
 ### What Changed

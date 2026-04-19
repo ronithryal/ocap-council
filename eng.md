@@ -129,6 +129,34 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 
 ---
 
+### 16. FORENSIC_OS Full UI Rebuild + Diligence 404 Fix
+
+**Session:** 2026-04-19
+
+**Changes made:**
+
+1. **Full UI rebuild to FORENSIC_OS design system** — All 4 views rebuilt from scratch to match the FORENSIC_OS mockups. Zero border-radius, `#0b0e14` bg, `#00ff41` green, `#feb700` amber, `Space Grotesk` headings, `JetBrains Mono` code labels.
+
+2. **`layout.tsx` stripped** — Removed the old padded wrapper (`p-8`, `Header`, background blobs). Pages are now full-bleed and manage their own `ml-[240px]` offset and fixed top bar. This was necessary because each view has a different top bar layout.
+
+3. **Sidebar rebuilt** — Amber robot logo, INIT_SCAN green CTA, 4 nav items (ARCHITECT / HUNTING / AUDIT / DILIGENCE), TERMINAL + LOGS footer links, surgical hover trace effect (left border + glow).
+
+4. **Architect page (`/`)** — 3-column layout: Session Map left panel (agent status, session list, context depth bar) · Chat/input center (BountyInput → HydrationChat → AgentTracker → QuoteCard → ForensicDashboard) · Prompt Telemetry right panel (final prompt build %, hunting readiness vectors, extracted parameters, target artifact code block).
+
+5. **Hunting page (`/hunting`)** — New page. Live Interrogation Log with `[HIT]`/`[WARN]`/`[INFO]`/`[AI_SLOP_FLAG]` tagged entries, auto-scroll toggle, Active Targets Node Map with grid overlay, source breakdown bars. Currently mock data — to be wired to `agent_logs` Supabase Realtime.
+
+6. **Audit page (`/audit`)** — Rebuilt as 3-column diff viewer: GRIT_MARKERS left panel (real Supabase `engineer_reports` or mock markers) · Diff viewer center with line numbers, +/- gutter, AI slop flag amber indicator · AI_SLOP_FLAGS right panel with confidence score + CTO justification from live data. Left panel is live; diff viewer is still mock.
+
+7. **Diligence page (`/diligence`)** — New page. 3-column: GRIT_SCORE big number with percentile badge + score bar · CORE_COMPETENCIES 2×2 grid with letter grades · TRACEABLE_EVIDENCE list with warn flags. Terminal log at bottom. RECOMMENDATION: HIRE verdict box top-right. Currently 100% mock — to be wired to `engineer_reports` via `?reportId=`.
+
+8. **Diligence 404 fix** — Root cause: `POST /api/bounty/[id]/dispatch` was inserting the vendor to the DB but only returning `findings.selectedVendor` (which has no `id` field). The frontend fell back to `'live-vendor'` as the vendorId, which doesn't exist in the DB. Fix: dispatch route now spreads `vendor?.id` (the real Supabase UUID) into the response. Frontend stores the real UUID and passes it to the diligence POST body.
+
+**Build:** `✓ Compiled successfully` — 11 routes, zero TypeScript errors. Commits `7cb7df0` and `bd68e87` pushed to `origin/GritHunter`.
+
+**Live vs. Mock status:** See `report.md` for full audit. Summary: Architect core flow is fully live (Perplexity → vendor → Claude → ForensicScore). Hunting and Diligence pages are 100% mock. Audit left panel is live (Supabase), diff viewer is mock.
+
+---
+
 ### 13. Open Infra Debt (carry forward)
 - **Forensic Code Library (pgvector):** Still empty. Diligence currently scores in isolation. Next unlock is similarity search against ~50 seeded Gold Standard PRs.
 - **Settlement UI:** `EscrowButton.tsx` intentionally parked — OnchainKit v1.x has breaking API changes with wagmi v2 (`calls` shape, `ConnectWallet` props). Re-enable once V2 Dashboard is fully built.
