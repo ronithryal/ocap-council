@@ -135,3 +135,27 @@ Before surfacing any "Smoking Gun" URL, the Hunter must internally answer:
 - **Dashboard Quality:** CTOs now see 8/10 and 9/10 candidates by default, not "DO NOT HIRE" noise.
 - **Trust Moat Reinforcement:** The pre-vetting layer ensures OCAP is the only system in 2026 that filters out AI-slop *before* it reaches the dashboard.
 - **Next Unlock:** Once the Forensic Code Library (pgvector) is seeded with ~50 Gold Standard PRs, the system can compare new candidates against "God-Tier" benchmarks, making the quality gates even tighter over time.
+
+---
+
+## [2026-04-19] Enum Cleanup, $2k Removal & Audit History Live
+
+### What Changed
+This session completed the final cleanup of the deprecated `$2k atomic trial` product concept and wired the Audit History page to real data.
+
+**Recommendation Enum Rename (`HIRE_FOR_TRIAL` → `HIRE`):**
+The original enum value was named after a specific product mechanic (a $2,000 USDC work trial) that was deprioritized in the Phase 2 pivot. The new value `HIRE` is cleaner, more flexible, and doesn't tie the recommendation to a specific payment amount. Companies handle trial/contract terms differently — the platform's job is to surface the signal, not dictate the terms.
+
+**$2k References Removed:**
+All remaining hardcoded `$2,000` and `$2k` strings have been purged from UI copy, button labels, and code comments. The "HIRE FOR TRIAL — $2,000 USDC" action button is now "HIRE CANDIDATE."
+
+**Audit History Page (`/audit`) — Now Live:**
+The page previously showed hardcoded mock data. It now fetches real `engineer_reports` rows from Supabase via `createBrowserClient`, ordered by most recent first. CTOs can now see a running history of every forensic analysis run through the system.
+
+**`engineer_reports` Schema Expanded:**
+The Supabase table and TypeScript types now store the full `ForensicScore` shape — `archetype`, `dimensions` (JSONB), `grit_markers` (JSONB), `recommendation`, and `smoking_gun_url`. Previously only `grit_score`, `red_flags`, and `justification` were persisted, making the audit history incomplete.
+
+### Product Impact
+- The `/audit` page is now a real audit trail, not a demo stub.
+- Every bounty run through the diligence pipeline produces a permanent, queryable record.
+- The recommendation language is now neutral and employer-friendly — no implied payment terms.

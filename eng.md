@@ -77,7 +77,7 @@ Built out and debugged the full pipeline: `perplexity.ts` (Hunter) → `github.t
 *   **GitHub token:** Generated a Classic PAT scoped to `public_repo` only. Rate limit 60/hr → 5000/hr.
 
 **Calibration runs (both completed end-to-end, structured output via Claude tool-use):**
-*   `golang/go#78798` (1-word typo in a panic message) → **gritScore 1/10, DO_NOT_HIRE, "noise not signal."** Rubric correctly refuses to greenlight the $2k.
+*   `golang/go#78798` (1-word typo in a panic message) → **gritScore 1/10, DO_NOT_HIRE, "noise not signal."** Rubric correctly refuses to greenlight the hire.
 *   `rust-lang/rust#135179` (method dispatch / vtable work in `rustc_hir_typeck`) → **gritScore 7/10, NEEDS_HUMAN_REVIEW, classified as State Architect.** Grit markers quoted specific file paths and named the autoderef/use_receiver_trait machinery.
 
 The rubric is behaving exactly as designed: skeptical by default, rewards domain-aware naming and explicit invariants, flags happy-path-only tests.
@@ -91,18 +91,43 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 **What the dashboard shows:**
 - **Grit Score** (0–10) with color-coded progress bars
 - **Archetype** badge (Concurrency Master, State Architect, Chaos Engineer, Generalist, Uncategorized)
-- **Recommendation Banner** (HIRE_FOR_TRIAL / NEEDS_HUMAN_REVIEW / DO_NOT_HIRE) with color-coded icons
+- **Recommendation Banner** (HIRE / NEEDS_HUMAN_REVIEW / DO_NOT_HIRE) with color-coded icons
 - **4-Dimension Grid:** Edge Case Density, Architectural Intent, Code Fingerprint, Testing Rigor
 - **Grit Markers:** Green-coded bullet list of specific code patterns that proved engineering depth
 - **Red Flags:** Red-coded bullet list of AI-slop or carelessness indicators
-- **CTO Justification:** One-paragraph plain-language summary of why the candidate should or should not get the $2k
-- **Action Buttons:** "HIRE FOR TRIAL — $2,000 USDC" / "DO NOT HIRE" for `HIRE_FOR_TRIAL` recommendations
+- **CTO Justification:** One-paragraph plain-language summary of why the candidate should or should not be hired
+- **Action Buttons:** "HIRE CANDIDATE" / "DO NOT HIRE" for `HIRE` recommendations
 
 **Demo page uses real calibration data:**
 - `golang/go#78798` → 1/10, DO_NOT_HIRE (typo in panic message)
 - `rust-lang/rust#135179` → 7/10, NEEDS_HUMAN_REVIEW (compiler dispatch / vtable work)
 
 **Routing:** Available at `/forensic-demo` — serves as the prototype shell while the full V2 product UI is built.
+
+### 15. Enum Rename, $2k Scrub & Audit Page Wired to Supabase
+
+**Session:** 2026-04-19
+
+**Changes made:**
+
+1. **`HIRE_FOR_TRIAL` → `HIRE` enum rename** — The old value was a product-era artifact tied to the deprecated `$2k atomic trial` concept. Renamed across all files: `ForensicScore.recommendation` type, `RECOMMENDATION_CONFIG` map in `ForensicDashboard.tsx`, mock data in `audit/page.tsx` and `archive/forensic-demo/page.tsx`, and the action-button conditional.
+
+2. **`$2k` / `$2,000 USDC` scrub** — Removed all remaining hardcoded dollar amounts from UI copy and code comments:
+   - `ForensicDashboard.tsx` description: `"Ready for $2k atomic trial."` → `"Strong hire signal."`
+   - `ForensicDashboard.tsx` button: `"HIRE FOR TRIAL — $2,000 USDC"` → `"HIRE CANDIDATE"`
+   - `types/index.ts` comment: `"does a CTO spend $2k on this person?"` → `"hire, review, or reject?"`
+
+3. **`EngineerReport` type expanded** — Added `smokingGunUrl`, `archetype`, `dimensions`, `gritMarkers`, `recommendation` fields to match the full `ForensicScore` shape. The type was previously a stub that only stored `gritScore`, `redFlags`, and `justification`.
+
+4. **Diligence route persistence fix** — `POST /api/bounty/[id]/diligence` now writes the full `ForensicScore` to `engineer_reports`: `smoking_gun_url`, `archetype`, `dimensions` (JSONB), `grit_markers` (JSONB), `recommendation`. Previously only `grit_score`, `red_flags`, and `justification` were persisted.
+
+5. **`supabase/schema.sql` updated** — `engineer_reports` table now includes the new columns: `smoking_gun_url TEXT`, `archetype TEXT`, `dimensions JSONB`, `grit_markers JSONB`, `recommendation TEXT`.
+
+6. **Audit page wired to Supabase** — `src/app/audit/page.tsx` replaced its hardcoded `MOCK_REPORTS` array with a live `createBrowserClient` fetch from `engineer_reports`, ordered by `created_at DESC`, limit 50. Includes loading, error, and empty-state handling.
+
+**Build:** `✓ Compiled successfully` — zero TypeScript errors. Commit `e71bb5f` pushed to `origin/GritHunter`.
+
+---
 
 ### 13. Open Infra Debt (carry forward)
 - **Forensic Code Library (pgvector):** Still empty. Diligence currently scores in isolation. Next unlock is similarity search against ~50 seeded Gold Standard PRs.
@@ -134,7 +159,7 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 1. What specific technical problem does this PR solve?
 2. Would a senior engineer recognize this as non-trivial?
 3. Does this PR show understanding of broader system architecture?
-4. Would this PR pass the "CTO Test" — would a CTO pay $2k to trial this candidate?
+4. Would this PR pass the "CTO Test" — would a CTO want to hire this candidate?
 
 **Enhanced Return Schema:**
 - Added `grit_hypothesis` field: Agent states why this PR passes quality gates
