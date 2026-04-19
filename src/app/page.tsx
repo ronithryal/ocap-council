@@ -6,8 +6,10 @@ import { BountyInput } from '@/components/bounty/BountyInput';
 import { HydrationChat } from '@/components/bounty/HydrationChat';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
 import { QuoteCard } from '@/components/settlement/QuoteCard';
+import { ForensicDashboard } from '@/components/forensic/ForensicDashboard';
 import { Card } from '@/components/ui/card';
-import { AgentPhase, Vendor } from '@/types';
+import { Button } from '@/components/ui/button';
+import { AgentPhase, Vendor, ForensicScore } from '@/types';
 import { useAccount } from 'wagmi';
 
 export default function Home() {
@@ -16,6 +18,9 @@ export default function Home() {
   const [initialPrompt, setInitialPrompt] = useState<string>('');
   const [logs, setLogs] = useState<{ message: string }[]>([]);
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [bountyId, setBountyId] = useState<string | null>(null);
+  const [forensicReport, setForensicReport] = useState<ForensicScore | null>(null);
+  const [isForensicLoading, setIsForensicLoading] = useState(false);
   const [isSettled, setIsSettled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +30,44 @@ export default function Home() {
     setPhase('hydrating');
   };
 
+  const runForensicAnalysis = async () => {
+    if (!vendor || !bountyId) return;
+    
+    setIsForensicLoading(true);
+    setPhase('vetting');
+    
+    try {
+      const res = await fetch(`/api/bounty/${bountyId}/diligence`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendorId: vendor.id,
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Forensic analysis failed');
+      }
+      
+      const data = await res.json();
+      setForensicReport(data.score);
+      setLogs(prev => [...prev, { 
+        message: `Forensic Analysis complete. Grit Score: ${data.score.gritScore}/10. Call: ${data.score.recommendation}` 
+      }]);
+      setPhase('quote_received');
+    } catch (err: any) {
+      console.error('Forensic analysis error:', err);
+      setError(err.message);
+      setLogs(prev => [...prev, { message: `Forensic Analysis failed: ${err.message}` }]);
+    } finally {
+      setIsForensicLoading(false);
+    }
+  };
+
   const handleDispatch = async (finalPrompt: string) => {
     setPhase('dispatching');
     setVendor(null);
+    setForensicReport(null);
     setIsSettled(false);
     setError(null);
     setIsLoading(true);
@@ -51,6 +91,7 @@ export default function Home() {
       }
 
       const bounty = await createRes.json();
+      setBountyId(bounty.id);
 
       // 2. Update UI: navigating
       setPhase('navigating');
@@ -112,7 +153,7 @@ export default function Home() {
           ON-CHAIN AGENTIC PROCUREMENT
         </motion.h1>
         <p className="text-[#b9ccb2] font-mono tracking-widest text-xs uppercase">
-          Powered by Perplexity Computer Agent · Settled on Base via CDP
+          Powered by Perplexity Computer Agent · Forensic Code Analysis
         </p>
       </section>
 
@@ -141,12 +182,75 @@ export default function Home() {
 
             <div className="xl:col-span-7 h-full">
                <AnimatePresence mode="wait">
-                 {vendor ? (
-                   <QuoteCard 
-                    key="quote" 
-                    vendor={vendor} 
-                    onSettled={(hash) => setIsSettled(true)} 
-                   />
+                 {forensicReport ? (
+                   /* Forensic Dashboard - Show Grit Score Analysis */
+                   <motion.div
+                     key="forensic-dashboard"
+                     initial={{ opacity: 0, scale: 0.95 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                   >
+                     <ForensicDashboard
+                       report={forensicReport}
+                       developerHandle={vendor?.name || 'Unknown'}
+                       smokingGunUrl={vendor?.githubUrl || ''}
+                       onHireForTrial={() => setIsSettled(true)}
+                       onDoNotHire={() => {
+                         setForensicReport(null);
+                         setVendor(null);
+                         setPhase('idle');
+                       }}
+                     />
+                   </motion.div>
+                 ) : vendor && !forensicReport ? (
+                   /* Quote Card with "Run Forensic Analysis" option */
+                   <motion.div
+                     key="quote-card"
+                     initial={{ opacity: 0, scale: 0.95 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     className="space-y-4"
+                   >
+                     <QuoteCard 
+                       vendor={vendor} 
+                       onSettled={(hash) => setIsSettled(true)} 
+                     />
+                     
+                     {/* Run Forensic Analysis Button */}
+                     <Card className="bg-[#191c22] border-[#00ff41]/20 p-6 flex items-center justify-between" style={{ borderRadius: '0px' }}>
+                       <div className="flex items-center gap-4">
+                         <div className="h-12 w-12 bg-[#00ff41]/10 border border-[#00ff41]/20 flex items-center justify-center">
+                           <span className="material-symbols-outlined text-[#00ff41]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                             biotech
+                           </span>
+                         </div>
+                         <div>
+                           <h3 className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] uppercase">
+                             Run Forensic Analysis
+                           </h3>
+                           <p className="text-xs text-[#b9ccb2] font-mono">
+                             Pull raw diff, evaluate Grit vs AI-Slop
+                           </p>
+                         </div>
+                       </div>
+                       <Button
+                         onClick={runForensicAnalysis}
+                         disabled={isForensicLoading}
+                         className="bg-[#00ff41] hover:bg-[#72ff70] text-[#003907] font-['Space_Grotesk'] font-bold h-12 px-6 shadow-[0_0_20px_rgba(0,255,65,0.3)] transition-all"
+                         style={{ borderRadius: '0px' }}
+                       >
+                         {isForensicLoading ? (
+                           <>
+                             <div className="h-4 w-4 border-2 border-[#003907]/30 border-t-[#003907] rounded-full animate-spin mr-2" />
+                             ANALYZING...
+                           </>
+                         ) : (
+                           <>
+                             <span className="material-symbols-outlined text-[16px] mr-2">analytics</span>
+                             ANALYZE GRIT
+                           </>
+                         )}
+                       </Button>
+                     </Card>
+                   </motion.div>
                  ) : phase === 'failed' ? (
                    <motion.div 
                     initial={{ opacity: 0 }} 
@@ -210,7 +314,7 @@ export default function Home() {
             Candidate hired. Team notified for onboarding.
           </p>
           <button 
-            onClick={() => { setPhase('idle'); setVendor(null); setIsSettled(false); setLogs([]); }}
+            onClick={() => { setPhase('idle'); setVendor(null); setForensicReport(null); setIsSettled(false); setLogs([]); setBountyId(null); }}
             className="w-full py-2 bg-[#1d2026] hover:bg-[#272a31] text-xs font-['Space_Grotesk'] font-bold transition-all border border-[#3b4b37]"
             style={{ borderRadius: '0px' }}
           >
