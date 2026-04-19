@@ -25,7 +25,7 @@ const MOCK_REPORT: ForensicScore = {
     'Magic numbers without named constants',
   ],
   justification: 'Strong concurrency patterns with evidence of deep systems thinking. The candidate demonstrates awareness of edge cases in distributed systems, particularly around race conditions and memory ordering. The testing coverage is above average for this seniority level. Minor concerns around error handling patterns can be addressed during onboarding.',
-  recommendation: 'HIRE_FOR_TRIAL',
+  recommendation: 'HIRE',
 };
 
 export default function ForensicDemo() {

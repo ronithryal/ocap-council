@@ -122,15 +122,20 @@ export async function POST(
       droppedFiles,
     });
 
-    // 6. Persist the engineer report
+    // 6. Persist the engineer report (full ForensicScore shape)
     const { data: report, error: reportError } = await supabase
       .from('engineer_reports')
       .insert([{
         bounty_id: bountyId,
         developer_handle: developerHandle,
+        smoking_gun_url: smokingGunUrl,
         grit_score: score.gritScore,
+        archetype: score.archetype,
+        dimensions: score.dimensions,
+        grit_markers: score.gritMarkers,
         red_flags: score.redFlags,
         justification: score.justification,
+        recommendation: score.recommendation,
       }])
       .select()
       .single();

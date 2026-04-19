@@ -74,9 +74,14 @@ CREATE TABLE IF NOT EXISTS public.engineer_reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     bounty_id UUID NOT NULL REFERENCES public.bounties(id) ON DELETE CASCADE,
     developer_handle TEXT NOT NULL,
+    smoking_gun_url TEXT,
     grit_score NUMERIC,
+    archetype TEXT,
+    dimensions JSONB DEFAULT '{}'::jsonb,
+    grit_markers JSONB DEFAULT '[]'::jsonb,
     red_flags JSONB DEFAULT '[]'::jsonb,
     justification TEXT,
+    recommendation TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

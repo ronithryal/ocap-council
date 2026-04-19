@@ -42,11 +42,11 @@ const ARCHETYPE_CONFIG = {
 };
 
 const RECOMMENDATION_CONFIG = {
-  HIRE_FOR_TRIAL: {
+  HIRE: {
     label: 'RECOMMENDATION: HIRE',
     color: 'bg-[#00ff41]/10 border-[#00ff41]/30 text-[#00ff41]',
     icon: 'check_circle',
-    description: 'Clears the grit threshold. Ready for $2k atomic trial.',
+    description: 'Clears the grit threshold. Strong hire signal.',
   },
   NEEDS_HUMAN_REVIEW: {
     label: 'RECOMMENDATION: REVIEW',
@@ -207,14 +207,14 @@ export function ForensicDashboard({
       </Card>
 
       {/* Action Buttons - Forensic Precision */}
-      {report.recommendation === 'HIRE_FOR_TRIAL' && (
+      {report.recommendation === 'HIRE' && (
         <div className="flex gap-4">
           <Button
             onClick={onHireForTrial}
             className="flex-1 bg-[#00ff41] hover:bg-[#72ff70] text-[#003907] font-['Space_Grotesk'] font-bold h-12 border-none shadow-[0_0_20px_rgba(0,255,65,0.3)] transition-all active:opacity-50"
             style={{ borderRadius: '0px' }}
           >
-            HIRE FOR TRIAL — $2,000 USDC
+            HIRE CANDIDATE
           </Button>
           <Button
             onClick={onDoNotHire}

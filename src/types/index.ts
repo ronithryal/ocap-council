@@ -78,9 +78,14 @@ export interface EngineerReport {
   id: string;
   bountyId: string;
   developerHandle: string;
+  smokingGunUrl?: string;
   gritScore: number;
-  redFlags: string[]; // JSON array of warnings
+  archetype: ForensicScore['archetype'];
+  dimensions: ForensicScore['dimensions'];
+  gritMarkers: string[];
+  redFlags: string[];
   justification: string;
+  recommendation: ForensicScore['recommendation'];
   createdAt: string;
 }
 
@@ -116,8 +121,8 @@ export interface ForensicScore {
   // One-paragraph CTO-grade justification
   justification: string;
 
-  // Final call: does a CTO spend $2k on this person?
-  recommendation: 'HIRE_FOR_TRIAL' | 'NEEDS_HUMAN_REVIEW' | 'DO_NOT_HIRE';
+  // Final call: hire, review, or reject?
+  recommendation: 'HIRE' | 'NEEDS_HUMAN_REVIEW' | 'DO_NOT_HIRE';
 }
 
 /**
