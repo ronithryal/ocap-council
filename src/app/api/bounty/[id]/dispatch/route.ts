@@ -129,7 +129,10 @@ export async function POST(
     return NextResponse.json({
       status: 'dispatched',
       bountyId: id,
-      vendor: findings.selectedVendor,
+      vendor: {
+        ...findings.selectedVendor,
+        id: vendor?.id ?? null,  // include the real DB UUID
+      },
       alternativeCount: findings.alternativeVendors.length,
       rawOutput: findings.rawAgentOutput,
     });

@@ -103,7 +103,7 @@ export default function Home() {
       setLogs(prev => [...prev, { message: `Council Recommendation ready: ${result.vendor?.name || 'Vendor found'}` }]);
       if (result.vendor) {
         setVendor({
-          id: result.vendor.id || 'live-vendor',
+          id: result.vendor.id,  // real DB UUID from vendors table
           bountyId: bounty.id,
           name: result.vendor.name || 'Agent Result',
           credentials: result.vendor.credentials || '',
