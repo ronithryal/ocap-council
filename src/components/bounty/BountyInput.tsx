@@ -13,9 +13,10 @@ import { useAccount } from 'wagmi';
 interface BountyInputProps {
   onDispatch: (data: any) => void;
   isLoading: boolean;
+  onDescriptionChange?: (text: string) => void;
 }
 
-export function BountyInput({ onDispatch, isLoading }: BountyInputProps) {
+export function BountyInput({ onDispatch, isLoading, onDescriptionChange }: BountyInputProps) {
   const { address } = useAccount();
   const [description, setDescription] = useState('');
   const [budget, setBudget] = useState('500');
@@ -63,7 +64,7 @@ export function BountyInput({ onDispatch, isLoading }: BountyInputProps) {
               placeholder="e.g., I need a high-end videographer in SF for a 2-day shoot. Must have at least 5 years experience and provide a portfolio link. Budget is strict."
               className="min-h-[120px] bg-[#0b0e14] border-[#3b4b37]/20 focus:border-[#00ff41]/50 transition-all resize-none font-mono text-sm placeholder-[#84967e]/50"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => { setDescription(e.target.value); onDescriptionChange?.(e.target.value); }}
               style={{ borderRadius: '0px' }}
             />
             {/* Decorative scanline effect */}

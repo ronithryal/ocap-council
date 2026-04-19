@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createBrowserClient } from '@supabase/ssr';
 import { BountyInput } from '@/components/bounty/BountyInput';
 import { HydrationChat } from '@/components/bounty/HydrationChat';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
@@ -10,17 +11,49 @@ import { ForensicDashboard } from '@/components/forensic/ForensicDashboard';
 import { Button } from '@/components/ui/button';
 import { AgentPhase, Vendor, ForensicScore } from '@/types';
 
-// Session map entry
 interface Session {
   id: string;
   title: string;
   preview: string;
   status: 'COMPLETE' | 'ACTIVE' | 'PENDING';
+  agent_phase?: string;
+  created_at?: string;
+}
+
+// Compute prompt telemetry heuristics from raw text
+function computeTelemetry(text: string) {
+  if (!text || text.trim().length === 0) {
+    return { finalPromptBuild: 0, estCompletion: 'AWAITING_INPUT', clarity: 0, constraint: 0, ambiguity: 1 };
+  }
+  const words = text.trim().split(/\s+/).length;
+  const sentences = text.split(/[.!?]+/).filter(Boolean).length;
+  const questions = (text.match(/\?/g) || []).length;
+  const techKeywords = (text.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|api|async|concurrent|distributed|state|machine|architecture|system|design|performance|latency|throughput|memory|race|condition|mutex|channel|interface|lifetime|generic|trait|protocol|consensus|raft|paxos|sharding|replication)\b/gi) || []).length;
+  const constraints = (text.match(/\b(must|require|need|should|only|never|always|strict|exactly|minimum|maximum|at least|no more than)\b/gi) || []).length;
+
+  // Clarity: longer, more structured text = clearer
+  const clarity = Math.min(1, (words / 80) * 0.5 + (sentences / 5) * 0.3 + (techKeywords / 5) * 0.2);
+  // Constraint density: explicit requirements
+  const constraint = Math.min(1, (constraints / 6) * 0.6 + (techKeywords / 8) * 0.4);
+  // Ambiguity: short vague text = high ambiguity
+  const ambiguity = Math.max(0, 1 - clarity * 0.7 - constraint * 0.3);
+  // Overall build %: weighted average
+  const finalPromptBuild = Math.round((clarity * 40 + constraint * 40 + (1 - ambiguity) * 20));
+  const estCompletion = finalPromptBuild >= 80 ? 'READY' : finalPromptBuild >= 50 ? '1_ITERATION' : '2_ITERATIONS';
+
+  return {
+    finalPromptBuild,
+    estCompletion,
+    clarity: parseFloat(clarity.toFixed(2)),
+    constraint: parseFloat(constraint.toFixed(2)),
+    ambiguity: parseFloat(ambiguity.toFixed(2)),
+  };
 }
 
 export default function Home() {
   const [phase, setPhase] = useState<AgentPhase>('idle');
   const [initialPrompt, setInitialPrompt] = useState<string>('');
+  const [draftPrompt, setDraftPrompt] = useState<string>(''); // live text for telemetry
   const [logs, setLogs] = useState<{ message: string }[]>([]);
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [bountyId, setBountyId] = useState<string | null>(null);
@@ -29,22 +62,45 @@ export default function Home() {
   const [isSettled, setIsSettled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessions] = useState<Session[]>([
-    { id: '1', title: 'Data Pipeline Req', preview: 'Define Kafka to S3 ingestion...', status: 'COMPLETE' },
-    { id: '2', title: 'Distributed State', preview: 'Raft vs Paxos evaluation...', status: 'ACTIVE' },
-  ]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
 
-  // Prompt telemetry (mock, updates as user types)
-  const [telemetry] = useState({
-    finalPromptBuild: 42,
-    estCompletion: '2_ITERATIONS',
-    clarity: 0.65,
-    constraint: 0.92,
-    ambiguity: 0.31,
-  });
+  // Live telemetry computed from draft prompt
+  const telemetry = computeTelemetry(draftPrompt);
+
+  // Load sessions from Supabase bounties table
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    supabase
+      .from('bounties')
+      .select('id, title, description, agent_phase, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setSessions(data.map((b) => ({
+            id: b.id,
+            title: b.title || b.description?.substring(0, 40) || 'Untitled',
+            preview: b.description?.substring(0, 60) || '',
+            status: b.agent_phase === 'quote_received' || b.agent_phase === 'settled'
+              ? 'COMPLETE'
+              : b.agent_phase && b.agent_phase !== 'idle'
+              ? 'ACTIVE'
+              : 'PENDING',
+            agent_phase: b.agent_phase,
+            created_at: b.created_at,
+          })));
+        }
+        setSessionsLoading(false);
+      });
+  }, [isSettled, bountyId]); // refresh when a new bounty completes
 
   const startHydration = (data: any) => {
     setInitialPrompt(data.description);
+    setDraftPrompt(data.description);
     setPhase('hydrating');
   };
 
@@ -103,7 +159,7 @@ export default function Home() {
       setLogs(prev => [...prev, { message: `Council Recommendation ready: ${result.vendor?.name || 'Vendor found'}` }]);
       if (result.vendor) {
         setVendor({
-          id: result.vendor.id,  // real DB UUID from vendors table
+          id: result.vendor.id,
           bountyId: bounty.id,
           name: result.vendor.name || 'Agent Result',
           credentials: result.vendor.credentials || '',
@@ -132,7 +188,11 @@ export default function Home() {
     setLogs([]);
     setBountyId(null);
     setError(null);
+    setDraftPrompt('');
   };
+
+  // Context depth: based on telemetry
+  const contextDepth = Math.min(100, telemetry.finalPromptBuild + (phase !== 'idle' ? 20 : 0));
 
   return (
     <div className="min-h-screen bg-[#0b0e14]">
@@ -141,7 +201,6 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <span className="font-['Space_Grotesk'] font-bold text-[#00ff41] text-sm">CONSOLE_ALPHA</span>
           <span className="text-[#3b4b37] font-mono text-[10px]">|</span>
-          {/* Tab bar */}
           {['Hydration', 'Interrogation', 'Extraction'].map((tab, i) => (
             <button
               key={tab}
@@ -170,7 +229,7 @@ export default function Home() {
       {/* 3-column layout */}
       <div className="ml-[240px] pt-11 flex h-[calc(100vh-44px)]">
 
-        {/* Col 1: Session Map (left panel) */}
+        {/* Col 1: Session Map */}
         <div className="w-[260px] flex-shrink-0 border-r border-[#1a1f26]/60 flex flex-col bg-[#0b0e14]">
           <div className="px-4 py-3 border-b border-[#1a1f26]/40">
             <div className="flex items-center gap-2">
@@ -183,24 +242,33 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="px-4 py-3 border-b border-[#1a1f26]/40">
+          <div className="px-4 py-3 border-b border-[#1a1f26]/40 flex items-center justify-between">
             <span className="font-['Space_Grotesk'] text-[9px] uppercase tracking-widest text-[#84967e]">SESSION MAP</span>
+            <button onClick={resetAll} className="font-mono text-[8px] text-[#3b4b37] hover:text-[#84967e] uppercase tracking-widest transition-colors">+ NEW</button>
           </div>
 
           <div className="flex-1 overflow-y-auto py-2">
+            {sessionsLoading && (
+              <div className="px-4 py-3 font-mono text-[9px] text-[#3b4b37]">LOADING_SESSIONS...</div>
+            )}
+            {!sessionsLoading && sessions.length === 0 && (
+              <div className="px-4 py-3 font-mono text-[9px] text-[#3b4b37]">NO_SESSIONS_YET</div>
+            )}
             {sessions.map((s) => (
               <div
                 key={s.id}
                 className={`mx-2 mb-1 p-3 border cursor-pointer transition-colors ${
-                  s.status === 'ACTIVE'
+                  s.id === bountyId
                     ? 'border-[#00ff41]/30 bg-[#00ff41]/5'
                     : 'border-[#1a1f26]/40 hover:border-[#3b4b37]/60'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">{s.title}</span>
+                  <span className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px] truncate">{s.title}</span>
                   <span className={`font-mono text-[8px] px-1 flex-shrink-0 ${
-                    s.status === 'COMPLETE' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-[#feb700]/20 text-[#feb700]'
+                    s.status === 'COMPLETE' ? 'bg-[#00ff41]/20 text-[#00ff41]' :
+                    s.status === 'ACTIVE' ? 'bg-[#feb700]/20 text-[#feb700]' :
+                    'bg-[#3b4b37]/20 text-[#84967e]'
                   }`}>{s.status}</span>
                 </div>
                 <p className="font-mono text-[9px] text-[#84967e] truncate">{s.preview}</p>
@@ -208,14 +276,14 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Context depth */}
+          {/* Context depth — live from telemetry */}
           <div className="px-4 py-3 border-t border-[#1a1f26]/40">
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-mono text-[9px] text-[#84967e] uppercase">CONTEXT DEPTH</span>
-              <span className="font-mono text-[9px] text-[#00ff41]">84%</span>
+              <span className="font-mono text-[9px] text-[#00ff41]">{contextDepth}%</span>
             </div>
             <div className="h-1 bg-[#1a1f26]">
-              <div className="h-full bg-[#00ff41]" style={{ width: '84%' }} />
+              <div className="h-full bg-[#00ff41] transition-all duration-300" style={{ width: `${contextDepth}%` }} />
             </div>
           </div>
         </div>
@@ -226,7 +294,11 @@ export default function Home() {
             <AnimatePresence mode="wait">
               {phase === 'idle' && (
                 <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <BountyInput onDispatch={startHydration} isLoading={isLoading} />
+                  <BountyInput
+                    onDispatch={startHydration}
+                    isLoading={isLoading}
+                    onDescriptionChange={setDraftPrompt}
+                  />
                 </motion.div>
               )}
               {phase === 'hydrating' && (
@@ -288,8 +360,7 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          {/* Bottom input bar (shown when idle/hydrating) */}
-          {(phase === 'idle') && (
+          {phase === 'idle' && (
             <div className="border-t border-[#1a1f26]/60 p-4 bg-[#0b0e14]">
               <div className="flex items-center gap-2 text-[#84967e] font-mono text-[10px]">
                 <span>/upload_spec</span>
@@ -300,7 +371,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Col 3: Prompt Telemetry */}
+        {/* Col 3: Prompt Telemetry — live */}
         <div className="w-[260px] flex-shrink-0 flex flex-col bg-[#0b0e14]">
           <div className="px-5 py-4 border-b border-[#1a1f26]/40">
             <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-sm uppercase tracking-tight">PROMPT TELEMETRY</div>
@@ -310,29 +381,38 @@ export default function Home() {
           <div className="px-5 py-4 border-b border-[#1a1f26]/40">
             <div className="flex items-end justify-between mb-2">
               <span className="font-mono text-[9px] text-[#84967e] uppercase tracking-widest">FINAL PROMPT BUILD</span>
-              <span className="font-['Space_Grotesk'] font-black text-[#00ff41] text-xl">{telemetry.finalPromptBuild}%</span>
+              <span className={`font-['Space_Grotesk'] font-black text-xl transition-colors ${
+                telemetry.finalPromptBuild >= 80 ? 'text-[#00ff41]' :
+                telemetry.finalPromptBuild >= 40 ? 'text-[#feb700]' : 'text-[#84967e]'
+              }`}>{telemetry.finalPromptBuild}%</span>
             </div>
             <div className="h-1 bg-[#1a1f26]">
-              <div className="h-full bg-[#00ff41]" style={{ width: `${telemetry.finalPromptBuild}%` }} />
+              <div
+                className="h-full transition-all duration-300"
+                style={{
+                  width: `${telemetry.finalPromptBuild}%`,
+                  backgroundColor: telemetry.finalPromptBuild >= 80 ? '#00ff41' : telemetry.finalPromptBuild >= 40 ? '#feb700' : '#84967e'
+                }}
+              />
             </div>
             <div className="font-mono text-[9px] text-[#84967e] mt-1.5">EST_COMPLETION: {telemetry.estCompletion}</div>
           </div>
 
-          {/* Hunting readiness vectors */}
+          {/* Hunting readiness vectors — live */}
           <div className="px-5 py-4 border-b border-[#1a1f26]/40">
             <div className="font-['Space_Grotesk'] text-[9px] uppercase tracking-widest text-[#84967e] mb-3">HUNTING READINESS VECTORS</div>
             {[
-              { label: 'Clarity Score', val: telemetry.clarity, color: '#feb700' },
-              { label: 'Constraint Density', val: telemetry.constraint, color: '#00ff41' },
-              { label: 'Ambiguity Index', val: telemetry.ambiguity, color: '#ffb4ab' },
+              { label: 'Clarity Score', val: telemetry.clarity, color: telemetry.clarity >= 0.6 ? '#00ff41' : '#feb700' },
+              { label: 'Constraint Density', val: telemetry.constraint, color: telemetry.constraint >= 0.6 ? '#00ff41' : '#feb700' },
+              { label: 'Ambiguity Index', val: telemetry.ambiguity, color: telemetry.ambiguity <= 0.3 ? '#00ff41' : '#ffb4ab' },
             ].map((v) => (
               <div key={v.label} className="mb-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-['Space_Grotesk'] text-[10px] text-[#b9ccb2]">{v.label}</span>
-                  <span className="font-mono text-[10px]" style={{ color: v.color }}>{v.val.toFixed(2)}</span>
+                  <span className="font-mono text-[10px] transition-colors" style={{ color: v.color }}>{v.val.toFixed(2)}</span>
                 </div>
                 <div className="h-1 bg-[#1a1f26]">
-                  <div className="h-full" style={{ width: `${v.val * 100}%`, backgroundColor: v.color }} />
+                  <div className="h-full transition-all duration-300" style={{ width: `${v.val * 100}%`, backgroundColor: v.color }} />
                 </div>
               </div>
             ))}
@@ -347,10 +427,16 @@ export default function Home() {
                   <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">CANDIDATE</div>
                   <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">{vendor.name}</div>
                 </div>
+                {vendor.credentials && (
+                  <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
+                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">ARCHETYPE</div>
+                    <div className="font-['Space_Grotesk'] font-bold text-[#feb700] text-[11px]">{vendor.credentials}</div>
+                  </div>
+                )}
                 {vendor.githubUrl && (
                   <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
                     <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">SMOKING GUN</div>
-                    <div className="font-mono text-[9px] text-[#00ff41] truncate">{vendor.githubUrl}</div>
+                    <a href={vendor.githubUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-[9px] text-[#00ff41] truncate block hover:underline">{vendor.githubUrl}</a>
                   </div>
                 )}
               </div>
@@ -358,17 +444,30 @@ export default function Home() {
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">TOPOLOGY</div>
-                    <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">—</div>
+                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">WORDS</div>
+                    <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">
+                      {draftPrompt ? draftPrompt.trim().split(/\s+/).filter(Boolean).length : '—'}
+                    </div>
                   </div>
                   <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">THROUGHPUT</div>
-                    <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">—</div>
+                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">TECH TERMS</div>
+                    <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">
+                      {draftPrompt ? (draftPrompt.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|api|async|concurrent|distributed|state|machine|architecture|system|design|performance|latency|throughput|memory|race|condition|mutex|channel|interface|lifetime|generic|trait|protocol|consensus|raft|paxos|sharding|replication)\b/gi) || []).length : '—'}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-[#10131a] border border-[#00ff41]/20 p-3">
-                  <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">DOMAIN</div>
-                  <div className="font-['Space_Grotesk'] font-bold text-[#00ff41] text-[11px]">Awaiting Input</div>
+                <div className={`bg-[#10131a] border p-3 transition-colors ${
+                  telemetry.finalPromptBuild >= 80 ? 'border-[#00ff41]/30' :
+                  telemetry.finalPromptBuild >= 40 ? 'border-[#feb700]/20' : 'border-[#1a1f26]/60'
+                }`}>
+                  <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">STATUS</div>
+                  <div className={`font-['Space_Grotesk'] font-bold text-[11px] ${
+                    telemetry.finalPromptBuild >= 80 ? 'text-[#00ff41]' :
+                    telemetry.finalPromptBuild >= 40 ? 'text-[#feb700]' : 'text-[#84967e]'
+                  }`}>
+                    {telemetry.finalPromptBuild >= 80 ? 'READY_TO_DISPATCH' :
+                     telemetry.finalPromptBuild >= 40 ? 'NEEDS_REFINEMENT' : 'AWAITING_INPUT'}
+                  </div>
                 </div>
               </div>
             )}
@@ -384,7 +483,6 @@ export default function Home() {
               <div className="bg-[#10131a] border border-[#1a1f26]/40 p-2 font-mono text-[9px] text-[#84967e]">
                 <div>type HuntingPrompt = {'{'}</div>
                 <div className="pl-3">role: "System Architect",</div>
-                <div className="pl-3">task: "State Machine Design",</div>
                 <div className="pl-3">{'constraints: Array<Condition>,'}</div>
                 <div className="pl-3">evaluation_matrix: Metrics</div>
                 <div>{'}'}</div>
