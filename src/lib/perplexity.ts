@@ -41,6 +41,20 @@ const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/agent';
 
 function renderGoalSection(task: PerplexityTaskRequest): string {
   const objective = task.architectPlan?.hydratedRoleBrief || task.objective;
+  const hasLanes = (task.architectPlan?.capabilityBuckets?.length || 0) > 0;
+  
+  if (hasLanes) {
+    return `## GOAL
+You are the OCAP Council Forensic Hunter. Your mission is to execute explicit GitHub searches based on the provided CAPABILITY SEARCH LANES and surface a pool of candidate evidence stubs.
+
+Background Context:
+"${objective}"
+
+We are NOT looking for generic developers. We are hunting for "Grit Fingerprints" on GitHub — behavioral markers in real commits and pull requests (e.g., fixing mature race conditions, complex memory optimizations, non-trivial state refactors).
+
+Your job in this stage is DISCOVERY only. Do not rank or select a winner. Find 2-3 candidates per active capability bucket. Return candidates[] as before. Downstream systems will validate and score them.`;
+  }
+
   return `## GOAL
 You are the OCAP Council Forensic Hunter. Your mission is to surface a pool of candidate evidence stubs for the following highly technical requirement:
 
@@ -58,10 +72,17 @@ function renderSourcingPersona(task: PerplexityTaskRequest): string {
 
 function renderCapabilityLanes(task: PerplexityTaskRequest): string {
   if (!task.architectPlan?.capabilityBuckets?.length) return '';
-  const lanes = task.architectPlan.capabilityBuckets.map(b => 
-    `- **${b.name}** (Weight: ${b.weight})\n  ${b.description}\n  Artifact Hints: ${b.artifactHints.join(', ')}\n  Queries: ${b.searchQueries.join(', ')}`
-  ).join('\n');
-  return `\n\n## CAPABILITY SEARCH LANES\n${lanes}`;
+  const buckets = [...task.architectPlan.capabilityBuckets].sort((a, b) => b.weight - a.weight);
+  
+  const lanes = buckets.map((b, i) => 
+    `### PRIORITY ${i + 1}: **${b.name}** (Weight: ${b.weight} | ${b.weight >= 8 ? 'CRITICAL MUST-HAVE' : 'IMPORTANT'})
+${b.description}
+- **Execute these explicit Search Queries:**
+${b.searchQueries.map(q => `  * ${q}`).join('\n')}
+- **Look for these Artifact Hints:** ${b.artifactHints.join(', ')}`
+  ).join('\n\n');
+
+  return `\n\n## CAPABILITY SEARCH LANES (PRIMARY DISCOVERY DRIVERS)\n${lanes}`;
 }
 
 function renderDiscoveryGuidance(task: PerplexityTaskRequest): string {
@@ -120,17 +141,24 @@ ${custom}`;
 }
 
 function renderSearchStrategy(task: PerplexityTaskRequest): string {
-  const hasLanes = (task.architectPlan?.capabilityBuckets?.length || 0) > 0;
-  const queries = hasLanes 
-    ? `Use the specific search queries mapped in the CAPABILITY SEARCH LANES.`
-    : `Use generic GitHub search queries like:
-- "github.com pull request merged"
-- "site:github.com/*/pull"
-- "github.com/username/repo/pull/"`;
+  const buckets = task.architectPlan?.capabilityBuckets;
+  if (buckets && buckets.length > 0) {
+    const allQueries = buckets.flatMap(b => b.searchQueries).map(q => `- ${q}`).join('\n');
+    return `\n\n## SEARCH STRATEGY
+Search specifically for individual PR and commit pages — not repo homepages.
+    
+Execute the following specific GitHub search queries directly:
+${allQueries}
+
+When you find a developer matching a query, navigate to their specific PR or commit page and use that URL directly.`;
+  }
 
   return `\n\n## SEARCH STRATEGY
 Search specifically for individual PR and commit pages — not repo homepages.
-${queries}
+Use generic GitHub search queries like:
+- "github.com pull request merged"
+- "site:github.com/*/pull"
+- "github.com/username/repo/pull/"
 
 When you find a developer, navigate to their specific PR or commit page and use that URL directly.`;
 }

@@ -362,3 +362,10 @@ Previously, OCAP passed raw recruiter text directly into the agent. We found tha
 
 **Impact on PMF:**
 This fundamentally shifts our value proposition. We aren't just a "search box" for talent; OCAP is now translating a CTO's raw intent into an opinionated, programmatic "Hunting Strategy." By feeding a structured Architect Plan into Perplexity, our resulting candidates are hyper-calibrated to the exact capability lanes the CTO values most, increasing our placement rate and dramatically lowering the noise floor.
+
+### The Explicit Discovery Pivot
+We have evolved the Architect concept even further. Initially, the Architect provided "contextual profiles" for the agent to consider. We’ve discovered that true precision requires absolute instruction, not polite profiles. 
+
+**The Shift:** The Architect now compiles precise **Search Queries** inside each Capability Bucket, and the Perplexity discovery agent is strictly commanded to use *only* those queries, finding 2-3 candidates against each active lane. 
+
+**Why this wins:** We eliminated standard "description-based searching" in favor of "algorithmic execution." CTOs can now be confident that if they requested "Kubernetes Operators" with a Priority 9 weighting, the search engine executing the hunt wasn't just loosely inspired by K8s; it natively and explicitly queried exact operator paradigms directly against the global talent pool.

@@ -351,3 +351,11 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 - **De-monolithing the Formula:** Broke down `hydrateBrockmanPrompt()` in `src/lib/perplexity.ts` into a dozen pure rendering functions (e.g., `renderGoalSection`, `renderCapabilityLanes`, `renderSearchStrategy`).
 - **Dynamic Fallbacks:** If `architectPlan` is omitted, the renderer configures fallback behavior to the legacy `task.objective` flow, preserving total backward compatibility for existing pipeline configurations and standard inputs. No downstream APIs were mutated.
 **Result:** The Perplexity Hunt phase is now driven by a formally hydrated "Architect Plan", mathematically directing downstream models to target heavily-weighted capability buckets (e.g., explicit logic shapes, PR/commit patterns) instead of generic keyword guessing.
+
+### 22. Perplexity Discovery Query Optimization (Mental Model Shift)
+**Motivation:** Iterative refinement revealed that simply passing "Capability Lanes" as context was insufficient. The agent was still treating the input as a "description" rather than an executable plan.
+**Changes made:**
+- **Explicit Instruction Overrides:** Re-rendered `renderCapabilityLanes` and `renderSearchStrategy` to treat `searchQueries[]` not as contextual hints, but as the raw strings to be executed.
+- **Priority Labeling:** Injected explicit weighting indicators (`CRITICAL MUST-HAVE` for weights >= 8) and ordered buckets by weight dynamically.
+- **Target Quotas:** Adjusted `renderGoalSection` to explicitly demand "2-3 candidates per active bucket", forcing the discovery phase to produce a diversified candidate pool reflecting all provided Capability Lanes rather than optimizing purely for narrative keywords.
+**Result:** Discovery execution is tightly coupled to the exact search queries compiled by the Architect, ensuring deep Github/LinkedIn API retrieval maps precisely to the CTO's required capability buckets.
