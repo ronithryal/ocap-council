@@ -345,3 +345,20 @@ All Phase C UI changes are implemented and passing `npm run build`:
 - Phase A: Deterministic artifact signal filter, strict citation validation
 - Phase B: `dispatchPerplexityPool`, full vendor pool persistence, parse error taxonomy
 - Phase C: SEARCH nav consolidation, 4-phase SearchPhaseNav, ShortlistPhase + ShortlistCard, Hunt log viewer + NodeMap embedded in main page, Audit `?url=` deep-linking
+
+---
+
+## [2026-04-20] The "Architect Plan" Integration
+
+### From Recruiter Prompt to Structured Execution
+
+Previously, OCAP passed raw recruiter text directly into the agent. We found that giving Perplexity an unstructured prompt led to inconsistent candidate discovery.
+
+**The Pivot:** The Architect Phase now serves as a rigorous compiler. Before discovering candidates, OCAP compiles user intent into an `ArchitectPlan` detailing:
+1. **Capability Search Lanes** (weighted skill buckets like "Concurrency vs CI/CD").
+2. **GitHub Signal Sets** (identifying which repo shapes, tooling, or libraries correlate with elite engineers).
+3. **Proof-of-Work Patterns** (the precise evidence required to prove mastery).
+4. **Hard Disqualifiers** (explicit patterns to automatically reject).
+
+**Impact on PMF:**
+This fundamentally shifts our value proposition. We aren't just a "search box" for talent; OCAP is now translating a CTO's raw intent into an opinionated, programmatic "Hunting Strategy." By feeding a structured Architect Plan into Perplexity, our resulting candidates are hyper-calibrated to the exact capability lanes the CTO values most, increasing our placement rate and dramatically lowering the noise floor.

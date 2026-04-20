@@ -1,4 +1,4 @@
-import { PerplexityTaskRequest, Vendor } from '@/types';
+import { PerplexityTaskRequest, Vendor, ArchitectPlan } from '@/types';
 import { parseGitHubUrl } from '@/lib/github';
 
 // ---------------------------------------------------------------------------
@@ -35,27 +35,41 @@ export interface CandidatePool {
 
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/agent';
 
-/**
- * Hydrate a raw user prompt into a structured Brockman Formula prompt.
- * 
- * The Brockman Formula (per Greg Brockman / OpenAI) structures prompts into:
- *   1. Goal — what the model must achieve
- *   2. Return Format — exact schema of the output
- *   3. Warnings — quality guardrails
- *   4. Context Dump — grounding metadata
- */
-function hydrateBrockmanPrompt(task: PerplexityTaskRequest): string {
-  return `
-## GOAL
+// ---------------------------------------------------------------------------
+// Prompt Construction Helpers
+// ---------------------------------------------------------------------------
+
+function renderGoalSection(task: PerplexityTaskRequest): string {
+  const objective = task.architectPlan?.hydratedRoleBrief || task.objective;
+  return `## GOAL
 You are the OCAP Council Forensic Hunter. Your mission is to surface a pool of candidate evidence stubs for the following highly technical requirement:
 
-"${task.objective}"
+"${objective}"
 
 We are NOT looking for generic developers. We are hunting for "Grit Fingerprints" on GitHub — behavioral markers in real commits and pull requests (e.g., fixing mature race conditions, complex memory optimizations, non-trivial state refactors).
 
-Your job in this stage is DISCOVERY only. Do not rank or select a winner. Return a pool of 3–8 candidates with evidence stubs. Downstream systems will validate and score them.
+Your job in this stage is DISCOVERY only. Do not rank or select a winner. Return a pool of 3–8 candidates with evidence stubs. Downstream systems will validate and score them.`;
+}
 
-## DISCOVERY GUIDANCE
+function renderSourcingPersona(task: PerplexityTaskRequest): string {
+  if (!task.architectPlan?.sourcingPersona) return '';
+  return `\n\n## SOURCING PERSONA\n${task.architectPlan.sourcingPersona}`;
+}
+
+function renderCapabilityLanes(task: PerplexityTaskRequest): string {
+  if (!task.architectPlan?.capabilityBuckets?.length) return '';
+  const lanes = task.architectPlan.capabilityBuckets.map(b => 
+    `- **${b.name}** (Weight: ${b.weight})\n  ${b.description}\n  Artifact Hints: ${b.artifactHints.join(', ')}\n  Queries: ${b.searchQueries.join(', ')}`
+  ).join('\n');
+  return `\n\n## CAPABILITY SEARCH LANES\n${lanes}`;
+}
+
+function renderDiscoveryGuidance(task: PerplexityTaskRequest): string {
+  let extraPrioritization = '';
+  if (task.architectPlan?.capabilityBuckets?.length) {
+    extraPrioritization = `\nPrioritize artifacts that align with the higher-weight Capability Search Lanes defined above.\n`;
+  }
+  return `\n\n## DISCOVERY GUIDANCE${extraPrioritization}
 Prioritize artifacts that exhibit these complexity markers:
 1. **Architectural Scope:** Changes across 3+ files in different directories/subsystems
 2. **Logic Density:** Non-trivial production logic (not auto-generated, not doc/config/test)
@@ -63,18 +77,66 @@ Prioritize artifacts that exhibit these complexity markers:
 4. **Edge Case Handling:** Malformed input, boundary conditions, error recovery
 5. **Technical Depth:** Language-specific primitives (Go interfaces, Rust lifetimes, C++ templates, Solidity assembly)
 
-Avoid surfacing: typo fixes, README/doc-only changes, formatting commits, dependency bumps, bot-authored PRs, single-line changes. We would rather have a smaller pool of genuine candidates than a large pool of noise.
+Avoid surfacing: typo fixes, README/doc-only changes, formatting commits, dependency bumps, bot-authored PRs, single-line changes. We would rather have a smaller pool of genuine candidates than a large pool of noise.`;
+}
 
-## SEARCH STRATEGY
+function renderSignalFilters(task: PerplexityTaskRequest): string {
+  const sig = task.architectPlan?.githubSignals;
+  if (!sig) return '';
+  return `\n\n## STACK + SIGNAL FILTERS
+- **Tech Stack:** ${sig.techStack.join(', ')}
+- **Keywords:** ${sig.keywords.join(', ')}
+- **Tools/Ecosystem:** ${sig.toolsEcosystem.join(', ')}
+- **Logic Patterns:** ${sig.logicPatterns.join(', ')}
+- **Repo Shapes:** ${sig.repoShapes.join(', ')}`;
+}
+
+function renderProofOfWork(task: PerplexityTaskRequest): string {
+  if (!task.architectPlan?.proofOfWorkRequirements?.length) return '';
+  const reqs = task.architectPlan.proofOfWorkRequirements.map(r => 
+    `- **Pattern:** ${r.evidencePattern}\n  **Why It Matters:** ${r.whyItMatters}\n  **Weak Signal Looks Like:** ${r.weakSignalLooksLike}`
+  ).join('\n');
+  return `\n\n## PROOF OF WORK\n${reqs}`;
+}
+
+function renderGoldMedalSignal(task: PerplexityTaskRequest): string {
+  if (!task.architectPlan?.goldMedalSignal) return '';
+  return `\n\n## GOLD MEDAL SIGNAL\n${task.architectPlan.goldMedalSignal}`;
+}
+
+function renderDisqualifiers(task: PerplexityTaskRequest): string {
+  const custom = task.architectPlan?.disqualifiers?.map(d => 
+    `- [${d.severity.toUpperCase()}] ${d.rule}: ${d.reason}`
+  ).join('\n') || '';
+  
+  return `\n\n## HARD DISQUALIFIERS
+- repo root URLs invalid
+- profile URLs invalid
+- typo/doc/formatting-only changes invalid
+- dependency bumps invalid
+- bot-authored PRs invalid
+- single-line low-signal changes invalid
+${custom}`;
+}
+
+function renderSearchStrategy(task: PerplexityTaskRequest): string {
+  const hasLanes = (task.architectPlan?.capabilityBuckets?.length || 0) > 0;
+  const queries = hasLanes 
+    ? `Use the specific search queries mapped in the CAPABILITY SEARCH LANES.`
+    : `Use generic GitHub search queries like:
+- "github.com pull request merged"
+- "site:github.com/*/pull"
+- "github.com/username/repo/pull/"`;
+
+  return `\n\n## SEARCH STRATEGY
 Search specifically for individual PR and commit pages — not repo homepages.
-Use queries like:
-- "github.com pull request prometheus exporter go merged"
-- "site:github.com/*/pull terraform lambda remediation"
-- "github.com/username/repo/pull/ ops-tooling self-healing"
+${queries}
 
-When you find a developer, navigate to their specific PR or commit page and use that URL directly.
+When you find a developer, navigate to their specific PR or commit page and use that URL directly.`;
+}
 
-## RETURN FORMAT
+function renderReturnFormat(): string {
+  return `\n\n## RETURN FORMAT
 Return a strict JSON object. Do NOT wrap in Markdown.
 
 CRITICAL for artifact_url — output the FULL DIRECT URL to the specific PR or commit page:
@@ -97,20 +159,46 @@ CRITICAL for artifact_url — output the FULL DIRECT URL to the specific PR or c
   "searchSummary": "Brief description of the search strategies used."
 }
 
-artifact_type: "pull_request" when artifact_url contains /pull/, "commit" when it contains /commit/.
+artifact_type: "pull_request" when artifact_url contains /pull/, "commit" when it contains /commit/.`;
+}
 
-## WARNINGS
+function renderWarnings(): string {
+  return `\n\n## WARNINGS
 - artifact_url MUST contain /pull/ or /commit/ — any other URL is rejected immediately.
 - Do NOT hallucinate URLs — only output URLs you actually visited during your search.
 - Return raw JSON only. No markdown, no conversational text.
 - Do NOT rank or filter to a single winner — return the full discovery pool.
-- developer_handle MUST be an individual GitHub user account (a human engineer), NOT an organization or company account. Reject handles like "google", "hashicorp", "microsoft", "signal-ai", "digirati-co-uk", or any handle that belongs to a company/org repo. Target the PR author or commit author's personal username only.
+- fewer valid results is better than invented candidates.
+- developer_handle MUST be an individual GitHub user account (a human engineer), NOT an organization or company account. Reject handles like "google", "hashicorp", "microsoft", "signal-ai", "digirati-co-uk", or any handle that belongs to a company/org repo. Target the PR author or commit author's personal username only.`;
+}
 
-## CONTEXT
-This output feeds OCAP's validation and forensic scoring pipeline. Only artifacts that pass GitHub metadata checks and deterministic signal filters will reach the scorer.
-Bounty ID: ${task.bountyId}
----
-`.trim();
+function renderContext(task: PerplexityTaskRequest): string {
+  let contextStr = `\n\n## CONTEXT\nThis output feeds OCAP's validation and forensic scoring pipeline. Only artifacts that pass GitHub metadata checks and deterministic signal filters will reach the scorer.\nBounty ID: ${task.bountyId}`;
+  if (task.constraints && task.constraints.length > 0) {
+    contextStr += `\nConstraints:\n- ${task.constraints.join('\n- ')}`;
+  }
+  return contextStr;
+}
+
+/**
+ * Hydrate a raw user prompt into a structured Brockman Formula prompt.
+ * Includes extended ArchitectPlan details if provided.
+ */
+function hydrateBrockmanPrompt(task: PerplexityTaskRequest): string {
+  return [
+    renderGoalSection(task),
+    renderSourcingPersona(task),
+    renderCapabilityLanes(task),
+    renderDiscoveryGuidance(task),
+    renderSignalFilters(task),
+    renderProofOfWork(task),
+    renderGoldMedalSignal(task),
+    renderDisqualifiers(task),
+    renderSearchStrategy(task),
+    renderReturnFormat(),
+    renderWarnings(),
+    renderContext(task),
+  ].filter(Boolean).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -472,17 +560,16 @@ export async function dispatchPerplexityAgent(task: PerplexityTaskRequest): Prom
   };
 }
 
-/**
- * Build a PerplexityTaskRequest from raw bounty data.
- * This is the bridge between the user's simple input and the structured agent task.
- */
-export function buildTaskFromBounty(bounty: {
-  id: string;
-  description: string;
-  budget: number;
-  title?: string;
-  category?: string;
-}): PerplexityTaskRequest {
+export function buildTaskFromBounty(
+  bounty: {
+    id: string;
+    description: string;
+    budget: number;
+    title?: string;
+    category?: string;
+  },
+  architectPlan?: ArchitectPlan
+): PerplexityTaskRequest {
   return {
     bountyId: bounty.id,
     objective: bounty.description,
@@ -493,5 +580,6 @@ export function buildTaskFromBounty(bounty: {
     ].filter(Boolean),
     maxBudget: bounty.budget,
     callbackUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/api/webhook/perplexity`,
+    architectPlan
   };
 }

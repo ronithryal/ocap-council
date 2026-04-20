@@ -130,12 +130,51 @@ export interface ForensicScore {
  * Based on the Sonar Reasoning / Computer Agent model
  */
 
+export interface CapabilityBucket {
+  name: string;
+  description: string;
+  searchQueries: string[];
+  artifactHints: string[];
+  weight: number;
+}
+
+export interface GitHubSignalSet {
+  techStack: string[];
+  keywords: string[];
+  toolsEcosystem: string[];
+  logicPatterns: string[];
+  repoShapes: string[];
+}
+
+export interface ProofOfWorkRequirement {
+  evidencePattern: string;
+  whyItMatters: string;
+  weakSignalLooksLike: string;
+}
+
+export interface DisqualifierRule {
+  rule: string;
+  reason: string;
+  severity: 'hard_reject' | 'caution';
+}
+
+export interface ArchitectPlan {
+  hydratedRoleBrief: string;
+  sourcingPersona?: string;
+  capabilityBuckets: CapabilityBucket[];
+  githubSignals: GitHubSignalSet;
+  proofOfWorkRequirements?: ProofOfWorkRequirement[];
+  disqualifiers?: DisqualifierRule[];
+  goldMedalSignal?: string;
+}
+
 export interface PerplexityTaskRequest {
   bountyId: string;
   objective: string;
-  constraints: string[];
-  maxBudget: number;
-  callbackUrl: string; // Our webhook
+  constraints?: string[];
+  maxBudget?: number;
+  callbackUrl?: string; // Our webhook
+  architectPlan?: ArchitectPlan;
 }
 
 export interface PerplexityWebhookResponse {

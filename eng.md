@@ -325,3 +325,29 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 - Added to `src/app/page.tsx`, `src/app/audit/page.tsx`, `src/app/diligence/page.tsx`.
 - Root cause: `createBrowserClient` in `@supabase/ssr` throws during Next.js static prerender if `NEXT_PUBLIC_SUPABASE_URL` is absent from the build environment. `force-dynamic` opts these pages out of static generation.
 - `npm run build` exits clean with all 12 routes prerendered/compiled correctly after copying `.env` to worktree `.env.local`.
+
+---
+
+## [2026-04-20] Phase C: "Thin State Router" UI Component Isolation
+
+### 20. God Component Presentational Extraction
+**Motivation:** `src/app/page.tsx` was an 800+ line God Component that intimately mixed deeply-nested state operations (API fetch phases, websocket streams) with massive chunks of pure presentational DOM mapping (SVG graphs, layout grid containers, telemetry mathematics). This made state debugging precarious and visual updates unnecessarily risky.
+**Changes made:**
+- **Extraction execution:** Stripped down strictly visual sub-trees into independent, highly-typed presentation shells inside `src/components/search/*`, enforcing a rule that `page.tsx` maintains complete ownership of `fetch` closures while components behave purely visually.
+- **Created `LiveInterrogationLog.tsx`:** Completely encapsulated the terminal DOM layout, the `huntAutoScroll` boolean state, the smooth-scrolling `useEffect`/`useRef`, and the static `PHASE_TAG` mapping.
+- **Created `PoolSummaryPanel.tsx`:** Extracted the Shortlist phase metrics grid, handling UI logic like conditional `candidate(s)` grammar mapping and forensic score progression bars.
+- **Complex Rebase Conflict Resolution:** During extraction, an intense mid-rebase git conflict occurred. The upstream `GritHunter` branch concurrently introduced newly-architected frontend UI logic directly inline in `page.tsx` (e.g., swapping "CONTEXT DEPTH" for "BRIEF_CONFIDENCE" and rendering highly specific `telemetry.clarity` "HUNTING READINESS VECTORS"). To guarantee zero feature-loss of these new signals via "stale" components, we successfully executed a **hybrid rebase operation**. We explicitly discarded our `SessionMapSidebar` and `TelemetryPanel` extractions in favor of upstream `HEAD` inline source code, while successfully saving the `LiveInterrogationLog` and `PoolSummaryPanel` abstractions.
+**Result:** Maintained strict visual compliance with the Forensic Console style-guide, decoupled 150+ lines of hard-coded layout noise from the main route engine, and preserved active remote feature upgrades seamlessly.
+
+---
+
+## [2026-04-20] Phase D: Perplexity ArchitectPlan Hydration
+
+### 21. Perplexity Prompt Structure - ArchitectPlan Hydration
+**Motivation:** The previous Perplexity prompt structure was a monolithic string template interpolation built exclusively around `task.objective`. It lacked the capacity for granular capability targeting or complex proof-of-work stipulations required by upstream Architect discovery plans.
+**Changes made:**
+- **Types Extraction:** Added strict TypeScript interfaces for `ArchitectPlan`, `CapabilityBucket`, `GitHubSignalSet`, `ProofOfWorkRequirement`, and `DisqualifierRule` in `src/types/index.ts`.
+- **`PerplexityTaskRequest` Enhanced:** Augmented with an optional `architectPlan: ArchitectPlan` member.
+- **De-monolithing the Formula:** Broke down `hydrateBrockmanPrompt()` in `src/lib/perplexity.ts` into a dozen pure rendering functions (e.g., `renderGoalSection`, `renderCapabilityLanes`, `renderSearchStrategy`).
+- **Dynamic Fallbacks:** If `architectPlan` is omitted, the renderer configures fallback behavior to the legacy `task.objective` flow, preserving total backward compatibility for existing pipeline configurations and standard inputs. No downstream APIs were mutated.
+**Result:** The Perplexity Hunt phase is now driven by a formally hydrated "Architect Plan", mathematically directing downstream models to target heavily-weighted capability buckets (e.g., explicit logic shapes, PR/commit patterns) instead of generic keyword guessing.
