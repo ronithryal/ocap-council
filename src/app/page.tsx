@@ -12,6 +12,12 @@ import { SearchPhaseNav } from '@/components/search/SearchPhaseNav';
 import { ShortlistPhase } from '@/components/shortlist/ShortlistPhase';
 import { Button } from '@/components/ui/button';
 import { AgentPhase, SearchPhase, Vendor, ForensicScore } from '@/types';
+import { computeTelemetry } from '@/lib/telemetry';
+import { NodeMap } from '@/components/search/NodeMap';
+import { TelemetryPanel } from '@/components/search/TelemetryPanel';
+import { LiveInterrogationLog } from '@/components/search/LiveInterrogationLog';
+import { SessionMapSidebar } from '@/components/search/SessionMapSidebar';
+import { PoolSummaryPanel } from '@/components/search/PoolSummaryPanel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,84 +39,7 @@ interface AgentLog {
   created_at: string;
 }
 
-// ─── NodeMap (hunt phase col3) ────────────────────────────────────────────────
 
-function extractRepoName(url: string | undefined): string | null {
-  if (!url) return null;
-  const m = url.match(/github\.com\/[^/]+\/([^/]+)/);
-  return m ? m[1] : null;
-}
-
-interface NodeMapProps { logs: AgentLog[] }
-
-function NodeMap({ logs }: NodeMapProps) {
-  const candidates = Array.from(new Set(
-    logs.filter(l => l.metadata?.developerHandle).map(l => l.metadata.developerHandle as string)
-  ));
-  const repos = Array.from(new Set(
-    logs.filter(l => l.metadata?.smokingGunUrl)
-      .map(l => extractRepoName(l.metadata.smokingGunUrl as string))
-      .filter(Boolean) as string[]
-  ));
-
-  const W = 260; const H = 200;
-  const bountyX = W / 2; const bountyY = 32;
-  const candidateNodes = candidates.slice(0, 3).map((handle, i) => {
-    const total = Math.min(candidates.length, 3);
-    return { id: `c-${i}`, label: handle, x: (W / (total + 1)) * (i + 1), y: H / 2 };
-  });
-  const repoNodes = repos.slice(0, 3).map((repo, i) => {
-    const total = Math.min(repos.length, 3);
-    return { id: `r-${i}`, label: repo, x: (W / (total + 1)) * (i + 1), y: H - 28 };
-  });
-
-  return (
-    <div className="relative overflow-hidden bg-[#0b0e14]" style={{ height: 200 }}>
-      <div className="absolute inset-0 opacity-10"
-        style={{ backgroundImage: 'linear-gradient(#00ff41 1px, transparent 1px), linear-gradient(90deg, #00ff41 1px, transparent 1px)', backgroundSize: '24px 24px' }}
-      />
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}
-        viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
-        {candidateNodes.map(cn => (
-          <line key={`l-bc-${cn.id}`} x1={bountyX} y1={bountyY} x2={cn.x} y2={cn.y}
-            stroke="#00ff41" strokeWidth="0.5" strokeOpacity="0.3" strokeDasharray="3 3" />
-        ))}
-        {candidateNodes.map(cn => repoNodes.map(rn => (
-          <line key={`l-cr-${cn.id}-${rn.id}`} x1={cn.x} y1={cn.y} x2={rn.x} y2={rn.y}
-            stroke="#feb700" strokeWidth="0.5" strokeOpacity="0.2" strokeDasharray="2 4" />
-        )))}
-      </svg>
-      {/* Bounty node */}
-      <div className="absolute z-10 flex flex-col items-center"
-        style={{ left: bountyX, top: bountyY, transform: 'translate(-50%, -50%)' }}>
-        <div className="border px-2 py-0.5 text-center" style={{ borderColor: '#00ff4150', backgroundColor: '#00ff4110' }}>
-          <div className="font-mono text-[7px] text-[#00ff41] uppercase">BOUNTY</div>
-        </div>
-      </div>
-      {candidateNodes.map(cn => (
-        <div key={cn.id} className="absolute z-10" style={{ left: cn.x, top: cn.y, transform: 'translate(-50%, -50%)' }}>
-          <div className="border px-2 py-0.5 text-center" style={{ borderColor: '#feb70040', backgroundColor: '#feb70010' }}>
-            <div className="font-mono text-[7px] text-[#feb700] uppercase">CAND</div>
-            <div className="font-mono text-[6px] text-[#84967e] truncate max-w-[64px]">{cn.label}</div>
-          </div>
-        </div>
-      ))}
-      {repoNodes.map(rn => (
-        <div key={rn.id} className="absolute z-10" style={{ left: rn.x, top: rn.y, transform: 'translate(-50%, -50%)' }}>
-          <div className="border px-2 py-0.5 text-center" style={{ borderColor: '#84967e40', backgroundColor: '#84967e10' }}>
-            <div className="font-mono text-[7px] text-[#84967e] uppercase">REPO</div>
-            <div className="font-mono text-[6px] text-[#84967e] truncate max-w-[64px]">{rn.label}</div>
-          </div>
-        </div>
-      ))}
-      {candidates.length === 0 && repos.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <span className="font-mono text-[9px] text-[#3b4b37]">NO_TARGETS_YET</span>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Prompt telemetry helpers ─────────────────────────────────────────────────
 
@@ -123,29 +52,6 @@ const PHASE_TAG: Record<string, { label: string; color: string }> = {
   failed:         { label: 'WARN',  color: '#ffb4ab' },
 };
 
-function getLogTag(phase: string, message: string) {
-  if (message.toLowerCase().includes('slop') || message.toLowerCase().includes('flag'))
-    return { label: 'AI_SLOP_FLAG', color: '#feb700' };
-  if (message.toLowerCase().includes('fail') || message.toLowerCase().includes('error'))
-    return { label: 'WARN', color: '#ffb4ab' };
-  return PHASE_TAG[phase] ?? { label: 'INFO', color: '#84967e' };
-}
-
-function computeTelemetry(text: string) {
-  if (!text || text.trim().length === 0) {
-    return { finalPromptBuild: 0, estCompletion: 'AWAITING_INPUT', clarity: 0, constraint: 0, ambiguity: 1 };
-  }
-  const words = text.trim().split(/\s+/).length;
-  const sentences = text.split(/[.!?]+/).filter(Boolean).length;
-  const techKeywords = (text.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|api|async|concurrent|distributed|state|machine|architecture|system|design|performance|latency|throughput|memory|race|condition|mutex|channel|interface|lifetime|generic|trait|protocol|consensus|raft|paxos|sharding|replication)\b/gi) || []).length;
-  const constraints = (text.match(/\b(must|require|need|should|only|never|always|strict|exactly|minimum|maximum|at least|no more than)\b/gi) || []).length;
-  const clarity = Math.min(1, (words / 80) * 0.5 + (sentences / 5) * 0.3 + (techKeywords / 5) * 0.2);
-  const constraint = Math.min(1, (constraints / 6) * 0.6 + (techKeywords / 8) * 0.4);
-  const ambiguity = Math.max(0, 1 - clarity * 0.7 - constraint * 0.3);
-  const finalPromptBuild = Math.round((clarity * 40 + constraint * 40 + (1 - ambiguity) * 20));
-  const estCompletion = finalPromptBuild >= 80 ? 'READY' : finalPromptBuild >= 50 ? '1_ITERATION' : '2_ITERATIONS';
-  return { finalPromptBuild, estCompletion, clarity: parseFloat(clarity.toFixed(2)), constraint: parseFloat(constraint.toFixed(2)), ambiguity: parseFloat(ambiguity.toFixed(2)) };
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -156,8 +62,7 @@ export default function Home() {
   const [draftPrompt, setDraftPrompt] = useState<string>('');
   const [logs, setLogs] = useState<{ message: string }[]>([]);
   const [huntLogs, setHuntLogs] = useState<AgentLog[]>([]);
-  const [huntAutoScroll, setHuntAutoScroll] = useState(true);
-  const huntLogEndRef = useRef<HTMLDivElement>(null);
+
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [alternatives, setAlternatives] = useState<{ id: string; name: string; credentials: string; githubUrl?: string; summary: string; quoteAmount: number }[]>([]);
   const [bountyId, setBountyId] = useState<string | null>(null);
@@ -170,6 +75,9 @@ const [isLoading, setIsLoading] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
   const telemetry = computeTelemetry(draftPrompt);
+  const wordCount = draftPrompt ? draftPrompt.trim().split(/\s+/).filter(Boolean).length : null;
+  const techTermsMatch = draftPrompt ? draftPrompt.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|api|async|concurrent|distributed|state|machine|architecture|system|design|performance|latency|throughput|memory|race|condition|mutex|channel|interface|lifetime|generic|trait|protocol|consensus|raft|paxos|sharding|replication)\b/gi) : null;
+  const techTermCount = techTermsMatch ? techTermsMatch.length : null;
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -231,13 +139,6 @@ const [isLoading, setIsLoading] = useState(false);
 
     return () => { supabase.removeChannel(channel); };
   }, [bountyId]);
-
-  // Hunt log auto-scroll
-  useEffect(() => {
-    if (huntAutoScroll && huntLogEndRef.current) {
-      huntLogEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [huntLogs, huntAutoScroll]);
 
   // Load a previous bounty session by ID
   const loadBounty = useCallback(async (id: string) => {
@@ -387,62 +288,7 @@ const [isLoading, setIsLoading] = useState(false);
 
   const contextDepth = Math.min(100, telemetry.finalPromptBuild + (phase !== 'idle' ? 20 : 0));
 
-  // Hunt phase col2: log viewer content
-  const huntCol2 = (
-    <div className="flex flex-col h-full">
-      <div className="px-5 py-3 border-b border-[#1a1f26]/40 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 bg-[#00ff41] rounded-full animate-pulse" />
-          <span className="font-['Space_Grotesk'] text-[10px] uppercase tracking-widest text-[#84967e]">LIVE INTERROGATION LOG</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[9px] text-[#3b4b37]">{huntLogs.length} ENTRIES</span>
-          <button
-            onClick={() => setHuntAutoScroll(v => !v)}
-            className={`font-mono text-[8px] uppercase tracking-widest px-2 py-1 border transition-colors ${
-              huntAutoScroll ? 'border-[#00ff41]/40 text-[#00ff41] bg-[#00ff41]/5' : 'border-[#3b4b37]/40 text-[#84967e]'
-            }`}
-          >
-            AUTOSCROLL {huntAutoScroll ? 'ON' : 'OFF'}
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] space-y-1">
-        {huntLogs.length === 0 && (
-          <div className="text-[#3b4b37] py-4">{bountyId ? 'NO_LOGS_YET' : 'NO_ACTIVE_SESSION'}</div>
-        )}
-        {huntLogs.map((log, i) => {
-          const tag = getLogTag(log.phase, log.message);
-          const ts = new Date(log.created_at).toLocaleTimeString('en-US', { hour12: false });
-          return (
-            <div key={log.id ?? i} className="flex items-start gap-3 py-0.5">
-              <span className="text-[#3b4b37] flex-shrink-0 w-20">{ts}</span>
-              <span className="flex-shrink-0 px-1 text-[9px] uppercase tracking-widest w-24 text-center"
-                style={{ color: tag.color, backgroundColor: `${tag.color}15` }}>
-                {tag.label}
-              </span>
-              <span className="text-[#b9ccb2] flex-1 leading-relaxed">{log.message}</span>
-            </div>
-          );
-        })}
-        <div ref={huntLogEndRef} />
-      </div>
-      <div className="border-t border-[#1a1f26]/40 px-5 py-2 flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] text-[#84967e]">HITS:</span>
-          <span className="font-mono text-[9px] text-[#00ff41]">
-            {huntLogs.filter(l => l.phase === 'awaiting_quote' || l.phase === 'quote_received').length}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] text-[#84967e]">WARNINGS:</span>
-          <span className="font-mono text-[9px] text-[#ffb4ab]">
-            {huntLogs.filter(l => l.phase === 'failed').length}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+
 
   // Hunt phase col3: node map + phase breakdown
   const huntCol3 = (
@@ -480,51 +326,7 @@ const [isLoading, setIsLoading] = useState(false);
     </div>
   );
 
-  // Shortlist phase col3: summary stats
-  const shortlistCol3 = (
-    <div className="flex flex-col h-full">
-      <div className="px-5 py-4 border-b border-[#1a1f26]/40">
-        <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-sm uppercase tracking-tight">POOL SUMMARY</div>
-      </div>
-      <div className="px-5 py-4 flex-1 space-y-4">
-        {vendor && (
-          <div className="space-y-2">
-            <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-              <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">PRIMARY</div>
-              <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">{vendor.name}</div>
-            </div>
-            {vendor.githubUrl && (
-              <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">SMOKING GUN</div>
-                <a href={vendor.githubUrl} target="_blank" rel="noopener noreferrer"
-                  className="font-mono text-[9px] text-[#00ff41] truncate block hover:underline">
-                  {vendor.githubUrl}
-                </a>
-              </div>
-            )}
-            {alternatives.length > 0 && (
-              <div className="bg-[#10131a] border border-[#feb700]/20 p-3">
-                <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">IN POOL</div>
-                <div className="font-['Space_Grotesk'] font-bold text-[#feb700] text-[11px]">
-                  {alternatives.length + 1} candidate{alternatives.length + 1 !== 1 ? 's' : ''}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {!vendor && (
-          <div className="font-mono text-[9px] text-[#3b4b37]">AWAITING_RESULTS</div>
-        )}
-        {forensicReport && (
-          <div className="bg-[#10131a] border border-[#00ff41]/20 p-3">
-            <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">GRIT SCORE</div>
-            <div className="font-['Space_Grotesk'] font-black text-[#00ff41] text-xl">{forensicReport.gritScore}/10</div>
-            <div className="font-mono text-[9px] text-[#84967e] mt-0.5">{forensicReport.recommendation}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+
 
   return (
     <div className="min-h-screen bg-[#0b0e14]">
@@ -647,7 +449,7 @@ const [isLoading, setIsLoading] = useState(false);
           )}
 
           {/* Hunt: live log viewer */}
-          {searchPhase === 'hunt' && huntCol2}
+          {searchPhase === 'hunt' && <LiveInterrogationLog bountyId={bountyId} logs={huntLogs} />}
 
           {/* Shortlist: candidate grid */}
           {searchPhase === 'shortlist' && (
@@ -771,7 +573,7 @@ const [isLoading, setIsLoading] = useState(false);
           {searchPhase === 'hunt' && huntCol3}
 
           {/* Shortlist: pool summary */}
-          {searchPhase === 'shortlist' && shortlistCol3}
+          {searchPhase === 'shortlist' && <PoolSummaryPanel vendor={vendor} alternativesCount={alternatives.length} forensicReport={forensicReport} />}
         </div>
       </div>
 
