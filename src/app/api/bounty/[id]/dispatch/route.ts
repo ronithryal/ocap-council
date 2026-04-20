@@ -94,7 +94,10 @@ export async function POST(
         metadata: { parseStatus: pool.parseStatus, rawSnippet: pool.rawAgentOutput.slice(0, 300) },
       }]);
       await supabase.from('bounties').update({ agent_phase: 'failed' }).eq('id', id);
-      return NextResponse.json({ error: 'Perplexity returned unparseable output' }, { status: 502 });
+      return NextResponse.json({
+        error: 'Perplexity returned unparseable output',
+        rawOutput: pool.rawAgentOutput,
+      }, { status: 502 });
     }
 
     const validStubs = pool.stubs.filter((s) => s.artifact_url !== null);
@@ -107,7 +110,10 @@ export async function POST(
         metadata: { parseStatus: pool.parseStatus, searchSummary: pool.searchSummary },
       }]);
       await supabase.from('bounties').update({ agent_phase: 'failed' }).eq('id', id);
-      return NextResponse.json({ error: 'No valid PR or commit artifacts found in candidate pool' }, { status: 422 });
+      return NextResponse.json({
+        error: 'No valid PR or commit artifacts found in candidate pool',
+        rawOutput: pool.rawAgentOutput,
+      }, { status: 422 });
     }
 
     await supabase.from('agent_logs').insert([{

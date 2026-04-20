@@ -204,7 +204,7 @@ export default function Home() {
 
   // Auto-advance search phase based on agent phase
   useEffect(() => {
-    if (phase === 'idle' || phase === 'hydrating') setSearchPhase('brief');
+    if (phase === 'idle' || phase === 'hydrating' || phase === 'failed') setSearchPhase('brief');
     else if (phase === 'dispatching') setSearchPhase('capability-map');
     else if (phase === 'navigating' || phase === 'vetting' || phase === 'awaiting_quote') setSearchPhase('hunt');
     else if (phase === 'quote_received' || phase === 'completed') setSearchPhase('shortlist');

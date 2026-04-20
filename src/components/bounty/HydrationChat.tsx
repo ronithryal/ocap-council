@@ -22,6 +22,7 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +39,8 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
         const data = await res.json();
         
         if (data.isReady) {
-          onComplete(initialPrompt);
+          setIsReady(true);
+          setMessages([{ role: 'user', content: initialPrompt }]);
         } else {
           setMessages([
             { role: 'user', content: initialPrompt },
@@ -86,8 +88,7 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
       const data = await res.json();
 
       if (data.isReady) {
-        // Final polish: let the architect finalize the Brockman prompt
-        onComplete(consolidatedPrompt);
+        setIsReady(true);
       } else {
         setMessages([...newMessages, { role: 'assistant' as const, content: data.reply }]);
       }
@@ -196,7 +197,28 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
           )}
         </div>
 
+        {/* Ready-to-dispatch confirmation banner */}
+        {isReady && (
+          <div className="px-6 py-4 bg-[#00ff41]/5 border-y border-[#00ff41]/30 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-2 bg-[#00ff41] animate-pulse" />
+              <div>
+                <div className="font-['Space_Grotesk'] font-bold text-[#00ff41] text-[11px] uppercase tracking-widest">PROMPT CLEARED FOR DISPATCH</div>
+                <div className="font-mono text-[9px] text-[#84967e] mt-0.5">Architect verified sufficient context · ready to run discovery</div>
+              </div>
+            </div>
+            <button
+              onClick={() => onComplete(messages.map(m => m.content).join('\n\n'))}
+              className="px-5 py-2 bg-[#00ff41] hover:bg-[#72ff70] text-[#003907] font-['Space_Grotesk'] font-black text-[10px] uppercase tracking-widest transition-all shadow-[0_0_16px_rgba(0,255,65,0.3)]"
+              style={{ borderRadius: '0px' }}
+            >
+              DISPATCH NOW
+            </button>
+          </div>
+        )}
+
         {/* Info Banner - Hunting Readiness Vectors */}
+        {!isReady && (
         <div className="px-6 py-3 bg-[#0b0e14] border-y border-[#3b4b37]/20 flex items-center justify-between">
            <div className="flex items-center gap-4">
              <p className="text-[10px] font-mono text-[#84967e] uppercase tracking-tight">
@@ -209,13 +231,14 @@ export function HydrationChat({ initialPrompt, onComplete, onCancel }: Hydration
                </div>
              </div>
            </div>
-           <button 
+           <button
              onClick={() => onComplete(messages.map(m => m.content).join('\n\n'))}
              className="text-[10px] font-['Space_Grotesk'] font-bold text-[#00ff41] hover:text-[#72ff70] transition-colors uppercase tracking-widest"
            >
              Override & Dispatch
            </button>
         </div>
+        )}
 
         {/* Input Area - Terminal Command Line */}
         <div className="p-4 bg-[#0b0e14]">
