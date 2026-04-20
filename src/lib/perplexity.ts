@@ -66,18 +66,23 @@ Prioritize artifacts that exhibit these complexity markers:
 Avoid surfacing: typo fixes, README/doc-only changes, formatting commits, dependency bumps, bot-authored PRs, single-line changes. We would rather have a smaller pool of genuine candidates than a large pool of noise.
 
 ## SEARCH STRATEGY
-You MUST search for and cite individual PR pages and commit pages — NOT repo homepages or user profiles. Your citations must contain "/pull/" or "/commit/" in the URL path.
+Search specifically for individual PR and commit pages — not repo homepages.
+Use queries like:
+- "github.com pull request prometheus exporter go merged"
+- "site:github.com/*/pull terraform lambda remediation"
+- "github.com/username/repo/pull/ ops-tooling self-healing"
 
-Use targeted search queries such as:
-- "site:github.com/*/pull rust lifetime ownership 2023"
-- "github.com pull request concurrent mutex goroutine merged"
-- "github.com/[username]/[repo]/pull/ state machine refactor"
-
-If a search result URL is a repo homepage (e.g., github.com/owner/repo with nothing after the repo name), do NOT cite it — search more specifically for that repo's PRs instead.
+When you find a developer, navigate to their specific PR or commit page and use that URL directly.
 
 ## RETURN FORMAT
-Return a strict JSON object with this exact structure. Do NOT wrap in Markdown.
-For artifact_url: use a citation ID like "[1]" if you have a search result citing a PR or commit page. If you have the direct URL to a specific PR or commit, you may include it as a raw URL string. NEVER use a repo homepage or profile URL.
+Return a strict JSON object. Do NOT wrap in Markdown.
+
+CRITICAL for artifact_url — output the FULL DIRECT URL to the specific PR or commit page:
+  VALID:   "https://github.com/hashicorp/terraform/pull/34521"
+  VALID:   "https://github.com/prometheus/client_golang/commit/abc123def456"
+  INVALID: "https://github.com/hashicorp/terraform"  ← repo root, REJECTED by pipeline
+  INVALID: "https://github.com/mitchellh"            ← profile, REJECTED by pipeline
+  INVALID: "[1]"                                      ← only use as absolute last resort
 
 {
   "candidates": [
@@ -85,20 +90,19 @@ For artifact_url: use a citation ID like "[1]" if you have a search result citin
       "developer_handle": "GitHub username",
       "repo": "owner/repo",
       "artifact_type": "pull_request",
-      "artifact_url": "[1]",
+      "artifact_url": "https://github.com/owner/repo/pull/123",
       "why_it_might_matter": "One sentence: what technical problem this artifact addresses and why it suggests depth."
     }
   ],
-  "searchSummary": "Brief description of the behavioral keywords and search strategies used."
+  "searchSummary": "Brief description of the search strategies used."
 }
 
-Rules for artifact_type: use "pull_request" for PR links (URL contains /pull/), "commit" for commit links (URL contains /commit/). Never use a repo root URL or a user profile URL as artifact_url — those are not valid evidence artifacts.
+artifact_type: "pull_request" when artifact_url contains /pull/, "commit" when it contains /commit/.
 
 ## WARNINGS
-- Do NOT hallucinate GitHub URLs or developer names.
-- artifact_url MUST point to a specific PR or commit — not a profile or repo root.
-- Citations that resolve to repo homepages are USELESS — the downstream pipeline will reject them.
-- Return raw JSON only. No conversational text.
+- artifact_url MUST contain /pull/ or /commit/ — any other URL is rejected immediately.
+- Do NOT hallucinate URLs — only output URLs you actually visited during your search.
+- Return raw JSON only. No markdown, no conversational text.
 - Do NOT rank or filter to a single winner — return the full discovery pool.
 
 ## CONTEXT
@@ -355,12 +359,25 @@ async function callPerplexityApi(
   const searchObj = data.output?.find((o: any) => o.type === 'search_results');
   const content = messageObj?.content?.[0]?.text;
 
+  // Log response structure once so we can see what the API actually returns
+  console.info('[Perplexity] response keys:', Object.keys(data));
+  if (data.output) {
+    console.info('[Perplexity] output types:', data.output.map((o: any) => o.type));
+  }
+
   if (!content) {
-    console.error('Unexpected Agent API payload structure:', data);
+    console.error('Unexpected Agent API payload structure:', JSON.stringify(data).slice(0, 500));
     throw new Error('Empty or misconfigured response from Perplexity Agent API');
   }
 
-  return { content, searchResults: searchObj?.results || [] };
+  // Search results may live in multiple locations depending on the API version
+  const searchResults: any[] =
+    searchObj?.results ||          // embedded in output array
+    data.search_results ||         // top-level field
+    data.citations ||              // alternate top-level field
+    [];
+
+  return { content, searchResults };
 }
 
 // ---------------------------------------------------------------------------
