@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { dispatchPerplexityAgent, buildTaskFromBounty } from '@/lib/perplexity';
+import { dispatchPerplexityPool, buildTaskFromBounty } from '@/lib/perplexity';
+import {
+  parseGitHubUrl,
+  getPullRequestMetadata,
+  listPullRequestFiles,
+  getCommitMetadata,
+  assessArtifactSignal,
+  type ArtifactSignalReport,
+} from '@/lib/github';
 
 /**
  * POST /api/bounty/[id]/dispatch
@@ -72,71 +80,152 @@ export async function POST(
     await supabase.from('agent_logs').insert([{
       bounty_id: id,
       phase: 'vetting',
-      message: 'Analyzing search results. Cross-referencing credentials against requirements...',
+      message: 'Perplexity discovery agent dispatched. Building candidate pool...',
     }]);
 
-    // 6. Execute the live Perplexity call
-    const findings = await dispatchPerplexityAgent(task);
+    // 6. Execute the live Perplexity call — returns a CandidatePool
+    const pool = await dispatchPerplexityPool(task);
 
-    // 7. Log the awaiting_quote phase
-    await supabase
-      .from('bounties')
-      .update({ agent_phase: 'awaiting_quote' })
-      .eq('id', id);
+    if (pool.parseStatus === 'parse_error') {
+      await supabase.from('agent_logs').insert([{
+        bounty_id: id,
+        phase: 'failed',
+        message: 'Discovery agent returned malformed JSON — could not extract candidate pool.',
+        metadata: { parseStatus: pool.parseStatus, rawSnippet: pool.rawAgentOutput.slice(0, 300) },
+      }]);
+      await supabase.from('bounties').update({ agent_phase: 'failed' }).eq('id', id);
+      return NextResponse.json({ error: 'Perplexity returned unparseable output' }, { status: 502 });
+    }
+
+    const validStubs = pool.stubs.filter((s) => s.artifact_url !== null);
+
+    if (pool.parseStatus === 'zero_valid') {
+      await supabase.from('agent_logs').insert([{
+        bounty_id: id,
+        phase: 'failed',
+        message: `Discovery agent returned ${pool.rawCandidateCount} candidate(s) but none resolved to a valid PR or commit URL. All citations were repo-root, profile, or missing.`,
+        metadata: { parseStatus: pool.parseStatus, searchSummary: pool.searchSummary },
+      }]);
+      await supabase.from('bounties').update({ agent_phase: 'failed' }).eq('id', id);
+      return NextResponse.json({ error: 'No valid PR or commit artifacts found in candidate pool' }, { status: 422 });
+    }
 
     await supabase.from('agent_logs').insert([{
       bounty_id: id,
-      phase: 'awaiting_quote',
-      message: `Vendor identified: ${findings.selectedVendor.name}. Calculating market-rate quote...`,
+      phase: 'vetting',
+      message: `Candidate pool received: ${validStubs.length} valid artifact(s) from ${pool.rawCandidateCount} total. Running deterministic signal filter per artifact...`,
+      metadata: { parseStatus: pool.parseStatus, searchSummary: pool.searchSummary },
     }]);
 
-    // 8. Store the primary vendor in the database
-    const { data: vendor, error: vendorError } = await supabase
-      .from('vendors')
-      .insert([{
+    // 7. Signal-filter each stub and build vendor insert rows
+    const defaultBudget = bounty.budget || 500;
+    type VendorRow = {
+      bounty_id: string;
+      name: string;
+      credentials: string;
+      quote_amount: number;
+      github_url: string | null;
+      summary: string;
+      is_verified: boolean;
+      is_primary: boolean;
+      validation_status: 'validated' | 'rejected' | 'pending';
+      artifact_type: string | null;
+      citation_id: number | null;
+      rejection_reason: string | null;
+    };
+
+    const vendorRows: VendorRow[] = [];
+    let primaryAssigned = false;
+
+    for (const stub of validStubs) {
+      const parsedUrl = parseGitHubUrl(stub.artifact_url!);
+      let signalReport: ArtifactSignalReport | null = null;
+
+      try {
+        if (parsedUrl.kind === 'pull') {
+          const [prMeta, prFiles] = await Promise.all([
+            getPullRequestMetadata(parsedUrl.owner, parsedUrl.repo, parsedUrl.number),
+            listPullRequestFiles(parsedUrl.owner, parsedUrl.repo, parsedUrl.number),
+          ]);
+          signalReport = assessArtifactSignal(prFiles, {
+            additions: prMeta.additions,
+            deletions: prMeta.deletions,
+            changed_files: prMeta.changed_files,
+            title: prMeta.title,
+            draft: prMeta.draft,
+          });
+        } else if (parsedUrl.kind === 'commit') {
+          const commitMeta = await getCommitMetadata(parsedUrl.owner, parsedUrl.repo, parsedUrl.sha);
+          signalReport = assessArtifactSignal(commitMeta.files, {
+            additions: commitMeta.stats.additions,
+            deletions: commitMeta.stats.deletions,
+            message: commitMeta.commit.message.split('\n')[0],
+          });
+        }
+      } catch (metaErr: any) {
+        await supabase.from('agent_logs').insert([{
+          bounty_id: id,
+          phase: 'vetting',
+          message: `Signal filter: metadata fetch failed for ${stub.artifact_url} — ${metaErr.message}. Storing as pending.`,
+        }]);
+      }
+
+      const validationStatus = signalReport
+        ? (signalReport.pass ? 'validated' : 'rejected')
+        : 'pending';
+
+      const isPrimary = validationStatus === 'validated' && !primaryAssigned;
+      if (isPrimary) primaryAssigned = true;
+
+      await supabase.from('agent_logs').insert([{
         bounty_id: id,
-        name: findings.selectedVendor.name,
-        credentials: findings.selectedVendor.credentials,
-        quote_amount: findings.selectedVendor.quoteAmount,
-        linkedin_url: findings.selectedVendor.linkedinUrl,
-        github_url: findings.selectedVendor.githubUrl,
-        summary: findings.selectedVendor.summary,
-        is_verified: findings.selectedVendor.isVerified ?? true,
-        is_primary: true,
-      }])
-      .select()
-      .single();
+        phase: 'vetting',
+        message: signalReport
+          ? `${stub.developer_handle} (${stub.artifact_url}): ${validationStatus}. ${signalReport.pass ? `Signals: [${signalReport.signals.join(', ') || 'none'}]` : `Rejected: ${signalReport.reason}`}`
+          : `${stub.developer_handle} (${stub.artifact_url}): pending (metadata unavailable).`,
+        metadata: { stub, signalReport },
+      }]);
+
+      vendorRows.push({
+        bounty_id: id,
+        name: stub.developer_handle || 'Unknown Developer',
+        credentials: stub.artifact_type === 'commit' ? 'Commit Contributor' : 'PR Contributor',
+        quote_amount: defaultBudget,
+        github_url: stub.artifact_url,
+        summary: stub.why_it_might_matter,
+        is_verified: validationStatus === 'validated',
+        is_primary: isPrimary,
+        validation_status: validationStatus,
+        artifact_type: stub.artifact_type,
+        citation_id: stub.citation_id,
+        rejection_reason: signalReport && !signalReport.pass ? signalReport.reason : null,
+      });
+    }
+
+    // If no stub passed validation, promote the first pending row as primary fallback
+    if (!primaryAssigned && vendorRows.length > 0) {
+      vendorRows[0].is_primary = true;
+      primaryAssigned = true;
+    }
+
+    // 8. Persist all vendor rows in one insert
+    await supabase.from('bounties').update({ agent_phase: 'awaiting_quote' }).eq('id', id);
+
+    const { data: insertedVendors, error: vendorError } = await supabase
+      .from('vendors')
+      .insert(vendorRows)
+      .select();
 
     if (vendorError) {
-      console.error('Error storing primary vendor:', vendorError);
+      console.error('Error storing vendor pool:', vendorError);
     }
 
-    // 8b. Store alternative vendors (is_primary: false)
-    let alternativeRows: any[] = [];
-    if (findings.alternativeVendors && findings.alternativeVendors.length > 0) {
-      const altInserts = findings.alternativeVendors.map((alt) => ({
-        bounty_id: id,
-        name: alt.name || 'Unknown',
-        credentials: alt.credentials || '',
-        quote_amount: alt.quoteAmount || 0,
-        linkedin_url: alt.linkedinUrl ?? null,
-        github_url: alt.githubUrl ?? null,
-        summary: alt.summary || '',
-        is_verified: false,
-        is_primary: false,
-      }));
+    const allVendors = insertedVendors || [];
+    const primaryRow = allVendors.find((v) => v.is_primary) ?? allVendors[0] ?? null;
+    const alternativeRows = allVendors.filter((v) => !v.is_primary);
 
-      const { data: altData, error: altError } = await supabase
-        .from('vendors')
-        .insert(altInserts)
-        .select();
-
-      if (altError) {
-        console.error('Error storing alternative vendors:', altError);
-      } else {
-        alternativeRows = altData || [];
-      }
-    }
+    const validatedCount = allVendors.filter((v) => v.validation_status === 'validated').length;
+    const rejectedCount = allVendors.filter((v) => v.validation_status === 'rejected').length;
 
     // 9. Mark as quote_received
     await supabase
@@ -147,20 +236,29 @@ export async function POST(
     await supabase.from('agent_logs').insert([{
       bounty_id: id,
       phase: 'quote_received',
-      message: `Council Recommendation ready. ${findings.selectedVendor.name} — $${findings.selectedVendor.quoteAmount}. Awaiting settlement.`,
-      metadata: { 
-        vendor: findings.selectedVendor,
-        alternatives: findings.alternativeVendors.length,
+      message: `Council pool complete. ${validatedCount} validated, ${rejectedCount} rejected. Primary: ${primaryRow?.name ?? 'none'}.`,
+      metadata: {
+        totalStubs: validStubs.length,
+        validatedCount,
+        rejectedCount,
+        primaryVendorId: primaryRow?.id ?? null,
       },
     }]);
 
     return NextResponse.json({
       status: 'dispatched',
       bountyId: id,
-      vendor: {
-        ...findings.selectedVendor,
-        id: vendor?.id ?? null,  // include the real DB UUID
-      },
+      vendor: primaryRow
+        ? {
+            id: primaryRow.id,
+            name: primaryRow.name,
+            credentials: primaryRow.credentials,
+            githubUrl: primaryRow.github_url,
+            summary: primaryRow.summary,
+            quoteAmount: primaryRow.quote_amount,
+            validationStatus: primaryRow.validation_status,
+          }
+        : null,
       alternatives: alternativeRows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -168,9 +266,16 @@ export async function POST(
         githubUrl: row.github_url,
         summary: row.summary,
         quoteAmount: row.quote_amount,
+        validationStatus: row.validation_status,
+        rejectionReason: row.rejection_reason ?? null,
       })),
-      alternativeCount: findings.alternativeVendors.length,
-      rawOutput: findings.rawAgentOutput,
+      alternativeCount: alternativeRows.length,
+      candidatePool: {
+        total: validStubs.length,
+        validated: validatedCount,
+        rejected: rejectedCount,
+      },
+      rawOutput: pool.rawAgentOutput,
     });
 
   } catch (error: any) {

@@ -1,4 +1,37 @@
 import { PerplexityTaskRequest, Vendor } from '@/types';
+import { parseGitHubUrl } from '@/lib/github';
+
+// ---------------------------------------------------------------------------
+// Phase A: candidate pool types
+// ---------------------------------------------------------------------------
+
+/** Artifact types Perplexity is allowed to surface. Repo roots are not valid. */
+export type ArtifactType = 'pull_request' | 'commit';
+
+export interface CandidateEvidenceStub {
+  developer_handle: string;
+  /** "owner/repo" extracted from the artifact URL */
+  repo: string;
+  artifact_type: ArtifactType;
+  /** Resolved PR or commit URL. null means the citation could not be validated. */
+  artifact_url: string | null;
+  why_it_might_matter: string;
+  citation_id: number | null;
+}
+
+export interface CandidatePool {
+  stubs: CandidateEvidenceStub[];
+  /** Number of raw candidates in the parsed JSON before citation validation. */
+  rawCandidateCount: number;
+  /**
+   * 'ok'          — JSON parsed and ≥1 valid PR/commit URL resolved.
+   * 'zero_valid'  — JSON parsed but every citation resolved to null (all repo-root, profile, or missing).
+   * 'parse_error' — JSON could not be parsed at all.
+   */
+  parseStatus: 'ok' | 'zero_valid' | 'parse_error';
+  searchSummary: string;
+  rawAgentOutput: string;
+}
 
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/agent';
 
@@ -14,92 +47,159 @@ const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/agent';
 function hydrateBrockmanPrompt(task: PerplexityTaskRequest): string {
   return `
 ## GOAL
-You are the OCAP Council Forensic Hunter. Your mission is to find the top 1% of engineers for the following highly technical requirement:
+You are the OCAP Council Forensic Hunter. Your mission is to surface a pool of candidate evidence stubs for the following highly technical requirement:
 
 "${task.objective}"
 
-We are NOT looking for generic developers. We are hunting for "Grit Fingerprints" on GitHub. You must utilize agentic search strategies to find behavioral markers (e.g., fixing mature race conditions, complex memory optimizations, or 'spaghetti' logic refactoring).
+We are NOT looking for generic developers. We are hunting for "Grit Fingerprints" on GitHub — behavioral markers in real commits and pull requests (e.g., fixing mature race conditions, complex memory optimizations, non-trivial state refactors).
 
-## PRE-SOURCING QUALITY GATES (CRITICAL)
-Before you recommend ANY candidate, you MUST apply these filters. If a candidate fails ANY gate, REJECT them and keep searching.
+Your job in this stage is DISCOVERY only. Do not rank or select a winner. Return a pool of 3–8 candidates with evidence stubs. Downstream systems will validate and score them.
 
-### Negative Search Patterns (Auto-Reject)
-AVOID these types of contributions — they are "AI-slop" or trivial noise, NOT grit:
-- One-word typo fixes in error messages or panic strings
-- README, CHANGELOG, or documentation-only changes
-- Formatting changes (go fmt, rustfmt, prettier, eslint --fix)
-- Adding or updating .gitignore, license files, or config defaults
-- "Apply suggestions" from bots or dependency updates
-- Test-only changes that don't modify production logic
-- Single-line string changes or comment updates
+## DISCOVERY GUIDANCE
+Prioritize artifacts that exhibit these complexity markers:
+1. **Architectural Scope:** Changes across 3+ files in different directories/subsystems
+2. **Logic Density:** Non-trivial production logic (not auto-generated, not doc/config/test)
+3. **State/Concurrency Impact:** Shared state, mutexes, channels, state machines
+4. **Edge Case Handling:** Malformed input, boundary conditions, error recovery
+5. **Technical Depth:** Language-specific primitives (Go interfaces, Rust lifetimes, C++ templates, Solidity assembly)
 
-### Positive Complexity Heuristics (Must-Have)
-The ideal candidate's PR MUST exhibit at least 3 of these 5 markers:
-1. **Architectural Scope:** Changes to 3+ files across different directories/subsystems
-2. **Logic Density:** 50+ lines of non-trivial logic (no auto-generated code)
-3. **State/Concurrency Impact:** Modifies shared state, mutexes, channels, or state machines
-4. **Edge Case Handling:** Addresses malformed input, boundary conditions, or error recovery paths
-5. **Technical Depth:** Uses language-specific primitives (Go interfaces, Rust lifetimes, C++ templates, Solidity assembly)
-
-### Internal Mini-Audit (Required Step)
-For EACH candidate you consider, BEFORE selecting the "Smoking Gun", you must internally answer:
-1. What specific technical problem does this PR solve?
-2. Would a senior engineer recognize this as non-trivial?
-3. Does this PR show understanding of the broader system architecture?
-4. Would this PR pass the "CTO Test" — would a CTO want to hire this candidate?
-
-If you cannot confidently answer YES to all 4 questions, REJECT the candidate.
-
-## TECHNICAL VETTING (THE ARCHETYPES)
-Your search must categorize candidates into one of these archetypes based on their raw code history:
-1. **Concurrency Masters:** (Search for PRs fixing memory leaks, race conditions, using mutexes in Rust, C++, Go).
-2. **State Architects:** (Search for PRs decoupling monolithic state into explicit, verifiable state machines).
-3. **Chaos Engineers:** (Search for PRs implementing deep edge-case handling like exponential backoffs, dead-lock prevention, or handling malformed data gracefully).
+Avoid surfacing: typo fixes, README/doc-only changes, formatting commits, dependency bumps, bot-authored PRs, single-line changes. We would rather have a smaller pool of genuine candidates than a large pool of noise.
 
 ## RETURN FORMAT
-Return your findings as a strict JSON object with this exact structure. 
-For the 'smoking_gun_url', DO NOT attempt to write the actual URL string. Instead, write the numerical citation ID referencing the search result (e.g., "[1]"). We will extract the true URL. Do NOT wrap the JSON in Markdown.
+Return a strict JSON object with this exact structure. Do NOT wrap in Markdown. Do NOT write raw URLs — use citation IDs only (e.g., "[1]").
 
 {
-  "selectedCandidate": {
-    "developer_handle": "GitHub Username",
-    "archetype_label": "Concurrency Master | State Architect | Chaos Engineer",
-    "smoking_gun_url": "[1]",
-    "grit_hypothesis": "Why this PR passes the Pre-Sourcing Quality Gates (cite specific technical markers)",
-    "summary": "Deep forensic technical justification summarizing why this specific PR proves their grit and avoids AI-slop."
-  },
-  "alternativeCandidates": [
+  "candidates": [
     {
-      "developer_handle": "...",
-      "archetype_label": "...",
-      "smoking_gun_url": "[2]",
-      "grit_hypothesis": "...",
-      "summary": "..."
+      "developer_handle": "GitHub username",
+      "repo": "owner/repo",
+      "artifact_type": "pull_request",
+      "artifact_url": "[1]",
+      "why_it_might_matter": "One sentence: what technical problem this artifact addresses and why it suggests depth."
     }
   ],
-  "searchSummary": "Brief description of the behavioral keywords and filters used during your forensic search.",
-  "rejectedCandidates": [
-    {
-      "developer_handle": "...",
-      "smoking_gun_url": "...",
-      "rejectionReason": "Why this candidate was rejected (e.g., 'Single-line typo fix in error message')"
-    }
-  ]
+  "searchSummary": "Brief description of the behavioral keywords and search strategies used."
 }
+
+Rules for artifact_type: use "pull_request" for PR links, "commit" for commit links. Never use a repo root URL or a user profile URL as artifact_url — those are not valid evidence artifacts.
 
 ## WARNINGS
 - Do NOT hallucinate GitHub URLs or developer names.
-- The 'smoking_gun_url' MUST be a link to a specific GitHub Pull Request or Commit, NOT a user profile.
-- You must ONLY return raw JSON. Do not include conversational text or markdown blocks like \`\`\`json.
-- Do NOT base recommendations on social followers or stars. Rely solely on the technical depth of their commits.
-- NEVER surface a candidate who just fixed a typo or updated docs. We would rather return NO candidates than waste the CTO's time with noise.
+- artifact_url MUST be a citation ID like "[1]" pointing to a specific PR or commit, not a profile or repo root.
+- Return raw JSON only. No conversational text.
+- Do NOT rank or filter to a single winner — return the full discovery pool.
 
 ## CONTEXT
-This output will be fed directly into OCAP's Forensic Labeler which pulls the raw .diff file of the smoking_gun_url for semantic evaluation. Pricing and trial terms are handled directly between employer and candidate.
+This output feeds OCAP's validation and forensic scoring pipeline. Only artifacts that pass GitHub metadata checks and deterministic signal filters will reach the scorer.
 Bounty ID: ${task.bountyId}
 ---
 `.trim();
 }
+
+// ---------------------------------------------------------------------------
+// Phase A: candidate pool parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a Perplexity citation reference (e.g., "[1]") to a validated GitHub URL.
+ *
+ * Strict: only resolves to PR or commit URLs. Repo-root, profile, and any
+ * non-GitHub URLs are rejected and return null. Raw URL fallback is intentionally
+ * removed — hallucinated URLs pass no structural validation.
+ */
+function resolveCitationStrict(
+  val: string | null,
+  searchResults: any[],
+): { url: string | null; citationId: number | null } {
+  if (!val) return { url: null, citationId: null };
+
+  const match = val.match(/\[(\d+)\]/);
+  if (!match) return { url: null, citationId: null };
+
+  const id = parseInt(match[1], 10);
+  const source = searchResults.find((s) => s.id === id);
+  if (!source?.url) return { url: null, citationId: id };
+
+  const parsed = parseGitHubUrl(source.url);
+  if (parsed.kind !== 'pull' && parsed.kind !== 'commit') {
+    return { url: null, citationId: id };
+  }
+  return { url: source.url, citationId: id };
+}
+
+/**
+ * Parse a Perplexity agent response into a structured CandidatePool.
+ * Distinguishes three failure modes via parseStatus:
+ *   'ok'          — parsed and ≥1 valid PR/commit URL resolved
+ *   'zero_valid'  — parsed successfully but all citations resolved to null
+ *   'parse_error' — JSON could not be extracted at all
+ */
+export function parseCandidatePool(
+  content: string,
+  _bountyId: string,
+  searchResults: any[] = [],
+): CandidatePool {
+  const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+  let jsonString = '';
+  const jsonMatch = cleanContent.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (jsonMatch?.[1]) {
+    jsonString = jsonMatch[1].trim();
+  } else {
+    const braceMatch = cleanContent.match(/\{[\s\S]*\}/);
+    jsonString = braceMatch ? braceMatch[0] : cleanContent;
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch {
+    return {
+      stubs: [],
+      rawCandidateCount: 0,
+      parseStatus: 'parse_error',
+      searchSummary: '',
+      rawAgentOutput: cleanContent,
+    };
+  }
+
+  const rawCandidates: any[] = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+  const stubs: CandidateEvidenceStub[] = rawCandidates.map((c) => {
+    const { url, citationId } = resolveCitationStrict(c.artifact_url, searchResults);
+    const repoFromUrl = (() => {
+      if (!url) return c.repo ?? '';
+      try {
+        const p = parseGitHubUrl(url);
+        if (p.kind === 'pull' || p.kind === 'commit') return `${p.owner}/${p.repo}`;
+      } catch {}
+      return c.repo ?? '';
+    })();
+
+    return {
+      developer_handle: c.developer_handle ?? '',
+      repo: repoFromUrl,
+      artifact_type: (c.artifact_type === 'commit' ? 'commit' : 'pull_request') as ArtifactType,
+      artifact_url: url,
+      why_it_might_matter: c.why_it_might_matter ?? '',
+      citation_id: citationId,
+    };
+  });
+
+  const validCount = stubs.filter((s) => s.artifact_url !== null).length;
+  const parseStatus = validCount > 0 ? 'ok' : 'zero_valid';
+
+  return {
+    stubs,
+    rawCandidateCount: rawCandidates.length,
+    parseStatus,
+    searchSummary: parsed.searchSummary ?? '',
+    rawAgentOutput: cleanContent,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Legacy vendor-shape parser (private — fallback only)
+// ---------------------------------------------------------------------------
 
 /**
  * Parse the Perplexity response to extract structured vendor data.
@@ -189,33 +289,30 @@ function parseVendorFromResponse(
   }
 }
 
-/**
- * Dispatch a live Perplexity Sonar Agent to search, vet, and recommend vendors.
- * Uses the sonar-deep-research model for autonomous multi-step web research.
- */
-export async function dispatchPerplexityAgent(task: PerplexityTaskRequest): Promise<{
-  selectedVendor: Partial<Vendor>;
-  alternativeVendors: Partial<Vendor>[];
-  rawAgentOutput: string;
-}> {
+// ---------------------------------------------------------------------------
+// Shared HTTP transport — keeps fetch logic in one place
+// ---------------------------------------------------------------------------
+
+async function callPerplexityApi(
+  task: PerplexityTaskRequest,
+): Promise<{ content: string; searchResults: any[] }> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) {
-    throw new Error('PERPLEXITY_API_KEY is not configured');
-  }
+  if (!apiKey) throw new Error('PERPLEXITY_API_KEY is not configured');
 
   const prompt = hydrateBrockmanPrompt(task);
 
   const response = await fetch(PERPLEXITY_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-      body: JSON.stringify({
+    body: JSON.stringify({
       preset: 'pro-search',
       input: prompt,
-      instructions: "You are the autonomous OCAP Council Procurement Agent. Follow the GOAL, PRE-SOURCING QUALITY GATES, TECHNICAL VETTING, RETURN FORMAT, and WARNINGS exactly. Output valid, parseable JSON and nothing else.",
-      tools: [{ type: "web_search" }],
+      instructions:
+        'You are the autonomous OCAP Council Discovery Agent. Follow the GOAL, DISCOVERY GUIDANCE, RETURN FORMAT, and WARNINGS exactly. Output valid, parseable JSON and nothing else.',
+      tools: [{ type: 'web_search' }],
     }),
   });
 
@@ -226,20 +323,105 @@ export async function dispatchPerplexityAgent(task: PerplexityTaskRequest): Prom
   }
 
   const data = await response.json();
-  
-  // Extract generated message and raw search references from the v1/agent output array
   const messageObj = data.output?.find((o: any) => o.type === 'message');
   const searchObj = data.output?.find((o: any) => o.type === 'search_results');
-  
   const content = messageObj?.content?.[0]?.text;
-  const searchResults = searchObj?.results || [];
 
   if (!content) {
     console.error('Unexpected Agent API payload structure:', data);
     throw new Error('Empty or misconfigured response from Perplexity Agent API');
   }
 
-  return parseVendorFromResponse(content, task.bountyId, searchResults, task.maxBudget || 500);
+  return { content, searchResults: searchObj?.results || [] };
+}
+
+// ---------------------------------------------------------------------------
+// Phase B primary export: returns the full CandidatePool
+// ---------------------------------------------------------------------------
+
+/**
+ * Dispatch the Perplexity discovery agent and return a structured candidate pool.
+ * This is the canonical export for Phase B — dispatch/route.ts uses this directly.
+ */
+export async function dispatchPerplexityPool(task: PerplexityTaskRequest): Promise<CandidatePool> {
+  const { content, searchResults } = await callPerplexityApi(task);
+  const pool = parseCandidatePool(content, task.bountyId, searchResults);
+
+  if (pool.parseStatus === 'parse_error') {
+    console.error(
+      `[Perplexity] parse_error — JSON could not be extracted. Raw output (first 300): ${content.slice(0, 300)}`,
+    );
+  } else if (pool.parseStatus === 'zero_valid') {
+    console.warn(
+      `[Perplexity] zero_valid — parsed ${pool.rawCandidateCount} candidate(s) but all citations resolved to null (repo-root or missing). Summary: ${pool.searchSummary}`,
+    );
+  } else {
+    const validCount = pool.stubs.filter((s) => s.artifact_url !== null).length;
+    console.info(
+      `[Perplexity] ok — ${validCount}/${pool.rawCandidateCount} candidates have valid PR/commit URLs. Summary: ${pool.searchSummary}`,
+    );
+  }
+
+  return pool;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy vendor-shape export — kept for backward-compat only
+// ---------------------------------------------------------------------------
+
+/**
+ * @deprecated Use dispatchPerplexityPool for Phase B and beyond.
+ * Retained so any callers outside dispatch/route.ts continue to compile.
+ */
+export async function dispatchPerplexityAgent(task: PerplexityTaskRequest): Promise<{
+  selectedVendor: Partial<Vendor>;
+  alternativeVendors: Partial<Vendor>[];
+  rawAgentOutput: string;
+}> {
+  const { content, searchResults } = await callPerplexityApi(task);
+  const pool = parseCandidatePool(content, task.bountyId, searchResults);
+
+  if (pool.parseStatus === 'parse_error') {
+    console.error(
+      `[Perplexity] parse_error (legacy path) — Raw output (first 300): ${content.slice(0, 300)}`,
+    );
+    return parseVendorFromResponse(content, task.bountyId, searchResults, task.maxBudget || 500);
+  }
+
+  const defaultBudget = task.maxBudget || 500;
+  const validStubs = pool.stubs.filter((s) => s.artifact_url !== null);
+  const [primary, ...rest] = validStubs;
+
+  return {
+    selectedVendor: primary
+      ? {
+          bountyId: task.bountyId,
+          name: primary.developer_handle || 'Unknown Developer',
+          credentials: primary.artifact_type === 'commit' ? 'Commit Contributor' : 'PR Contributor',
+          quoteAmount: defaultBudget,
+          githubUrl: primary.artifact_url ?? undefined,
+          summary: primary.why_it_might_matter,
+          isVerified: true,
+        }
+      : {
+          bountyId: task.bountyId,
+          name: 'Agent Research Output (No Valid Artifacts)',
+          credentials: 'See raw output for details',
+          quoteAmount: defaultBudget,
+          summary: pool.searchSummary || content.slice(0, 500),
+          isVerified: false,
+        },
+    alternativeVendors: rest.map((s) => ({
+      bountyId: task.bountyId,
+      name: s.developer_handle,
+      credentials: s.artifact_type === 'commit' ? 'Commit Contributor' : 'PR Contributor',
+      quoteAmount: defaultBudget,
+      githubUrl: s.artifact_url ?? undefined,
+      summary: s.why_it_might_matter,
+      isVerified: false,
+    })),
+    rawAgentOutput: pool.rawAgentOutput,
+  };
 }
 
 /**

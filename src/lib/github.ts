@@ -3,9 +3,240 @@
  *
  * Pulls raw `.diff` files from a Pull Request or Commit URL and strips
  * boilerplate so the LLM only sees logic that matters.
+ *
+ * Phase A additions: metadata fetchers and deterministic artifact signal filter.
  */
 
 const GITHUB_API_BASE = 'https://api.github.com';
+
+// ---------------------------------------------------------------------------
+// Artifact signal thresholds — tune here, not inline
+// ---------------------------------------------------------------------------
+
+/** Minimum total lines changed (additions + deletions) across all files. */
+const SIGNAL_MIN_TOTAL_LINES = 30;
+
+/**
+ * Minimum net lines in non-boilerplate, non-doc/config/test files.
+ * Applied after stripping noise files from the file list.
+ */
+const SIGNAL_MIN_LOGIC_LINES = 20;
+
+/** Minimum files spanning distinct top-level directories to flag multi-subsystem scope. */
+const SIGNAL_MULTI_SUBSYSTEM_FILE_COUNT = 3;
+
+/** Minimum signal-file lines to flag high logic density (informational). */
+const SIGNAL_HIGH_DENSITY_LINES = 50;
+
+// ---------------------------------------------------------------------------
+// Metadata types
+// ---------------------------------------------------------------------------
+
+export interface PRMetadata {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  draft: boolean;
+  merged: boolean;
+  additions: number;
+  deletions: number;
+  changed_files: number;
+  user: { login: string };
+  base: { repo: { full_name: string } };
+}
+
+export interface PRFile {
+  filename: string;
+  status: 'added' | 'modified' | 'removed' | 'renamed';
+  additions: number;
+  deletions: number;
+}
+
+export interface CommitMetadata {
+  sha: string;
+  commit: { message: string; author: { name: string; date: string } };
+  stats: { additions: number; deletions: number; total: number };
+  files: Array<{ filename: string; status: string; additions: number; deletions: number }>;
+  author: { login: string } | null;
+}
+
+export interface ArtifactSignalReport {
+  pass: boolean;
+  /** Primary rejection reason, or "passed" if all gates cleared. */
+  reason: string;
+  /** Positive complexity markers found (informational — not gates). */
+  signals: string[];
+  /** All rejection reasons that fired (may be more than one). */
+  rejections: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Shared auth helper
+// ---------------------------------------------------------------------------
+
+function githubJsonHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'OCAP-Council-Forensic-Engine/1.0',
+  };
+  const token = process.env.GITHUB_API_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+// ---------------------------------------------------------------------------
+// Metadata fetchers
+// ---------------------------------------------------------------------------
+
+export async function getPullRequestMetadata(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<PRMetadata> {
+  const res = await fetch(
+    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${number}`,
+    { headers: githubJsonHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`GitHub PR metadata fetch failed (${res.status}) for ${owner}/${repo}#${number}`);
+  }
+  return res.json();
+}
+
+export async function listPullRequestFiles(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<PRFile[]> {
+  const res = await fetch(
+    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`,
+    { headers: githubJsonHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`GitHub PR files fetch failed (${res.status}) for ${owner}/${repo}#${number}`);
+  }
+  return res.json();
+}
+
+export async function getCommitMetadata(
+  owner: string,
+  repo: string,
+  sha: string,
+): Promise<CommitMetadata> {
+  const res = await fetch(
+    `${GITHUB_API_BASE}/repos/${owner}/${repo}/commits/${sha}`,
+    { headers: githubJsonHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`GitHub commit metadata fetch failed (${res.status}) for ${owner}/${repo}@${sha}`);
+  }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic artifact signal filter
+// ---------------------------------------------------------------------------
+
+const DOC_CONFIG_TEST_PATTERNS = [
+  /\.md$/i,
+  /\.txt$/i,
+  /\.rst$/i,
+  /^\.?[A-Z_]+$/, // bare filenames like LICENSE, CHANGELOG, NOTICE
+  /\.(yml|yaml)$/, // config files; kept broad — logic-heavy CI files are edge cases
+  /\.toml$/,
+  /\.ini$/,
+  /\.cfg$/,
+  /\.env(\..+)?$/,
+  /\.spec\.(ts|js|tsx|jsx|py|rb|go)$/,
+  /_test\.(ts|js|tsx|jsx|py|rb|go|rs|cpp|c)$/,
+  /\.test\.(ts|js|tsx|jsx)$/,
+  /\/?(test|tests|spec|specs|__tests__|__mocks__)\//, // test directories
+];
+
+const BOT_COMMIT_PATTERNS = /^(chore|bot|dependabot|bump|release\b|update[\s_-]deps)/i;
+
+function isDocConfigTestFile(filename: string): boolean {
+  return DOC_CONFIG_TEST_PATTERNS.some((p) => p.test(filename));
+}
+
+/**
+ * Deterministic pre-filter for a single GitHub artifact (PR or commit).
+ * All rules are structural/statistical — no LLM judgment.
+ *
+ * @param files  File list from PR files API or commit metadata.
+ * @param meta   Aggregate stats + optional title/message for bot/chore detection.
+ */
+export function assessArtifactSignal(
+  files: Array<{ filename: string; additions: number; deletions: number }>,
+  meta: {
+    additions: number;
+    deletions: number;
+    changed_files?: number;
+    title?: string;      // PR title
+    message?: string;    // commit message (first line)
+    draft?: boolean;
+  },
+): ArtifactSignalReport {
+  const signals: string[] = [];
+  const rejections: string[] = [];
+
+  // Gate 1: trivial total scope
+  if (meta.additions + meta.deletions < SIGNAL_MIN_TOTAL_LINES) {
+    rejections.push('trivial_scope');
+  }
+
+  // Gate 2: all files are boilerplate
+  const nonBoilerplate = files.filter((f) => !isBoilerplateFile(f.filename));
+  if (files.length > 0 && nonBoilerplate.length === 0) {
+    rejections.push('only_boilerplate');
+  }
+
+  // Gate 3: bot-authored or dep-bump commit/PR
+  const titleOrMessage = (meta.title ?? '') + ' ' + (meta.message ?? '');
+  if (BOT_COMMIT_PATTERNS.test(titleOrMessage.trim())) {
+    rejections.push('dep_bump_or_chore');
+  }
+
+  // Gate 4: after stripping boilerplate, only docs/config/test files remain
+  const signalFiles = nonBoilerplate.filter((f) => !isDocConfigTestFile(f.filename));
+  if (nonBoilerplate.length > 0 && signalFiles.length === 0) {
+    rejections.push('docs_config_test_only');
+  }
+
+  // Gate 5: insufficient logic density in signal files
+  const signalLines = signalFiles.reduce((n, f) => n + f.additions + f.deletions, 0);
+  if (signalFiles.length > 0 && signalLines < SIGNAL_MIN_LOGIC_LINES) {
+    rejections.push('insufficient_logic_density');
+  }
+
+  // Gate 6: draft PR (unmerged work in progress)
+  if (meta.draft === true) {
+    rejections.push('unmerged_draft');
+  }
+
+  // Positive signals (informational)
+  const topDirs = new Set(signalFiles.map((f) => f.filename.split('/')[0]));
+  if (
+    signalFiles.length >= SIGNAL_MULTI_SUBSYSTEM_FILE_COUNT &&
+    topDirs.size >= SIGNAL_MULTI_SUBSYSTEM_FILE_COUNT
+  ) {
+    signals.push('multi_subsystem_scope');
+  }
+  if (signalLines >= SIGNAL_HIGH_DENSITY_LINES) {
+    signals.push('high_logic_density');
+  }
+  if (/mutex|race|deadlock|lock|atomic|lifetime|unsafe|assembly|state.machine/i.test(titleOrMessage)) {
+    signals.push('concurrency_state_hint');
+  }
+
+  const pass = rejections.length === 0;
+  return {
+    pass,
+    reason: pass ? 'passed' : rejections[0],
+    signals,
+    rejections,
+  };
+}
 
 export type ParsedGitHubUrl =
   | { kind: 'pull'; owner: string; repo: string; number: number }

@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchCleanDiff } from '@/lib/github';
+import {
+  fetchCleanDiff,
+  parseGitHubUrl,
+  getPullRequestMetadata,
+  listPullRequestFiles,
+  getCommitMetadata,
+  assessArtifactSignal,
+} from '@/lib/github';
 import { scoreForensicDiff } from '@/lib/forensic-scorer';
 
 /**
@@ -106,7 +113,87 @@ export async function POST(
       metadata: { keptFiles: keptFiles.slice(0, 20), droppedFiles: droppedFiles.slice(0, 20), truncated },
     }]);
 
-    // 5. Score the diff with Claude 3.5 Sonnet
+    // 5. Deterministic prefilter — reject weak artifacts before any Claude call
+    const parsedUrl = parseGitHubUrl(smokingGunUrl);
+
+    if (parsedUrl.kind === 'repo' || parsedUrl.kind === 'unknown') {
+      await supabase.from('agent_logs').insert([{
+        bounty_id: bountyId,
+        phase: 'vetting',
+        message: `Prefilter rejected: artifact URL is not a PR or commit (kind="${parsedUrl.kind}"). Only PR and commit URLs are valid evidence artifacts.`,
+        metadata: { smokingGunUrl, kind: parsedUrl.kind },
+      }]);
+      return NextResponse.json(
+        {
+          error: 'Artifact must be a PR or commit URL — repo-root and profile URLs are not valid evidence.',
+          kind: parsedUrl.kind,
+          smokingGunUrl,
+        },
+        { status: 400 },
+      );
+    }
+
+    let signalReport;
+    try {
+      if (parsedUrl.kind === 'pull') {
+        const [prMeta, prFiles] = await Promise.all([
+          getPullRequestMetadata(parsedUrl.owner, parsedUrl.repo, parsedUrl.number),
+          listPullRequestFiles(parsedUrl.owner, parsedUrl.repo, parsedUrl.number),
+        ]);
+        signalReport = assessArtifactSignal(prFiles, {
+          additions: prMeta.additions,
+          deletions: prMeta.deletions,
+          changed_files: prMeta.changed_files,
+          title: prMeta.title,
+          draft: prMeta.draft,
+        });
+      } else {
+        const commitMeta = await getCommitMetadata(parsedUrl.owner, parsedUrl.repo, parsedUrl.sha);
+        signalReport = assessArtifactSignal(commitMeta.files, {
+          additions: commitMeta.stats.additions,
+          deletions: commitMeta.stats.deletions,
+          message: commitMeta.commit.message.split('\n')[0],
+        });
+      }
+    } catch (metaErr: any) {
+      await supabase.from('agent_logs').insert([{
+        bounty_id: bountyId,
+        phase: 'vetting',
+        message: `Prefilter: GitHub metadata fetch failed — ${metaErr.message}. Proceeding without signal check.`,
+        metadata: { smokingGunUrl },
+      }]);
+      // Non-fatal: if metadata fetch fails (e.g., private repo), skip the gate and let diff scoring proceed
+      signalReport = null;
+    }
+
+    if (signalReport && !signalReport.pass) {
+      await supabase.from('agent_logs').insert([{
+        bounty_id: bountyId,
+        phase: 'vetting',
+        message: `Prefilter rejected artifact: ${signalReport.reason}. Rejections: [${signalReport.rejections.join(', ')}]. No scorer call made.`,
+        metadata: { smokingGunUrl, signalReport },
+      }]);
+      return NextResponse.json(
+        {
+          error: `Artifact rejected by deterministic prefilter: ${signalReport.reason}`,
+          rejections: signalReport.rejections,
+          signals: signalReport.signals,
+          smokingGunUrl,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (signalReport?.pass) {
+      await supabase.from('agent_logs').insert([{
+        bounty_id: bountyId,
+        phase: 'vetting',
+        message: `Prefilter passed. Signals: [${signalReport.signals.join(', ') || 'none'}]. Proceeding to forensic scorer.`,
+        metadata: { smokingGunUrl, signalReport },
+      }]);
+    }
+
+    // 6. Score the diff with Claude 3.5 Sonnet
     await supabase.from('agent_logs').insert([{
       bounty_id: bountyId,
       phase: 'vetting',
@@ -122,7 +209,7 @@ export async function POST(
       droppedFiles,
     });
 
-    // 6. Persist the engineer report (full ForensicScore shape)
+    // 7. Persist the engineer report (full ForensicScore shape)
     const { data: report, error: reportError } = await supabase
       .from('engineer_reports')
       .insert([{
@@ -144,7 +231,7 @@ export async function POST(
       console.error('Failed to persist engineer report:', reportError);
     }
 
-    // 7. Final log
+    // 8. Final log
     await supabase.from('agent_logs').insert([{
       bounty_id: bountyId,
       phase: 'vetting',

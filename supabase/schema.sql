@@ -29,12 +29,20 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     website_url TEXT,
     summary TEXT,
     is_verified BOOLEAN DEFAULT FALSE,
-    is_primary BOOLEAN NOT NULL DEFAULT TRUE,  -- FALSE for alternative candidates
+    is_primary BOOLEAN NOT NULL DEFAULT TRUE,    -- FALSE for alternative candidates
+    validation_status TEXT NOT NULL DEFAULT 'pending', -- pending | validated | rejected
+    artifact_type TEXT,                          -- pull_request | commit
+    citation_id INTEGER,                         -- Perplexity citation index that sourced this artifact
+    rejection_reason TEXT,                       -- set when validation_status = 'rejected'
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Migration: run this in Supabase SQL editor if the table already exists:
+-- Migration: run these in the Supabase SQL editor if the table already exists:
 -- ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT TRUE;
+-- ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS validation_status TEXT NOT NULL DEFAULT 'pending';
+-- ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS artifact_type TEXT;
+-- ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS citation_id INTEGER;
+-- ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 
 -- Agent Logs Table (for real-time tracker)
 CREATE TABLE IF NOT EXISTS public.agent_logs (

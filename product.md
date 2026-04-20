@@ -172,6 +172,82 @@ This is the "Council" metaphor made real — the agent presents a shortlist, the
 
 ## [2026-04-19] Enum Cleanup, $2k Removal & Audit History Live
 
+---
+
+## [2026-04-20] Phase A: Perplexity as Discovery Layer — Validation Pipeline Live
+
+### Architecture Shift: Perplexity is a Scout, Not a Judge
+
+The prior system gave Perplexity too much authority: it selected a winner, applied quality gates in the prompt, and its output went directly to Claude for scoring. This meant a hallucinated or low-signal artifact could reach the CTO dashboard without any structural check.
+
+**What changed:**
+- Perplexity now returns a **candidate pool** (3–8 stubs) — developer handle, repo, artifact URL, and one-line rationale. No ranking, no final selection.
+- Artifact URLs are validated against the GitHub URL structure before anything downstream runs. Repo-root and profile URLs are rejected — only PR and commit URLs are valid evidence.
+- A **deterministic prefilter** now gates every artifact before Claude sees it. Six rejection rules check for trivial scope, dep-bumps, bot-authored chores, doc/config/test-only changes, and draft PRs. These are structural checks — no LLM judgment involved.
+- If an artifact fails the prefilter, the diligence route returns a 400 with the specific rejection reason. The forensic scorer is not called.
+
+**What didn't change:**
+- The forensic scorer (Claude rubric) is untouched.
+- The frontend behavior is identical — the dispatch flow still returns a primary vendor and alternatives.
+- No schema changes were required.
+
+### Product Impact
+
+| Before Phase A | After Phase A |
+|---|---|
+| Perplexity picks the winner | Perplexity surfaces a pool; downstream validates |
+| Citation fallback accepts any URL with "http" | Only PR/commit URLs pass; repo-root silently rejected |
+| Weak artifacts reach Claude scorer | Deterministic gate rejects noise before any Claude call |
+| `repo`-root URL resolved to latest commit | Explicitly rejected at the diligence layer |
+| Quality gates enforced by prompt instructions | Quality gates enforced by code (auditable, tunable constants) |
+
+The six prefilter thresholds are named constants in `github.ts` — tunable without touching logic.
+
+### What's Next (Phase B)
+The `dispatch` route still maps the pool back to a single-primary-vendor shape. Phase B wires the pool directly into `dispatch/route.ts` — running the prefilter per candidate at discovery time, persisting all stubs with `validation_status`, and surfacing the multi-candidate pool to the frontend.
+
+---
+
+---
+
+## [2026-04-20] Phase B: Multi-Candidate Pool Persistence Live
+
+### What Changed
+
+The dispatch pipeline now persists the full candidate pool — not just a primary winner and a discarded alternatives list.
+
+**Every artifact Perplexity surfaces now has a lifecycle:**
+1. Perplexity returns a pool of 3–8 evidence stubs (PR or commit URLs only — repo-root/profile URLs are rejected at citation resolution).
+2. Each stub is run through GitHub metadata fetch + deterministic signal filter before anything is stored.
+3. All stubs land in the `vendors` table with a `validation_status`: `validated`, `rejected`, or `pending` (if metadata was unavailable, e.g. private repo).
+4. The first validated stub becomes the primary recommendation (`is_primary: true`). If nothing validates, the first pending stub is promoted as a fallback.
+
+**New failure modes surfaced to callers:**
+- `parse_error` (502): Perplexity returned malformed JSON — candidate pool could not be extracted at all.
+- `zero_valid` (422): JSON parsed, but every citation resolved to a non-artifact URL (repo root, profile, or missing). Distinct from a parse failure.
+
+**`agent_logs` now shows per-artifact detail:**
+Each stub gets its own log entry: pass/fail, specific rejection reason, and any positive signals found. CTOs or admins can trace exactly why a candidate was promoted or rejected — no black box.
+
+**Response shape backward-compatible:**
+The `vendor` key in the dispatch response still points to the primary recommendation. The new `candidatePool: { total, validated, rejected }` field is additive.
+
+### Schema Migration Required
+Run the following in the Supabase SQL editor before deploying:
+```sql
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS validation_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS artifact_type TEXT;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS citation_id INTEGER;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+```
+
+### What's Next
+- **Frontend:** Surface `validation_status` and `rejectionReason` in the HUNTING and ARCHITECT views so the CTO can see which candidates passed the filter and why.
+- **Forensic Code Library:** Seed pgvector with Gold Standard PRs — enables similarity-scored ranking within the validated pool rather than positional (first-pass) primary selection.
+- **`dispatchPerplexityAgent` removal:** Once no callers remain outside `dispatch/route.ts`, the deprecated legacy shim can be deleted.
+
+---
+
 ### What Changed
 This session completed the final cleanup of the deprecated `$2k atomic trial` product concept and wired the Audit History page to real data.
 

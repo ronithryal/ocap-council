@@ -157,6 +157,64 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 
 ---
 
+---
+
+## [2026-04-20] Phase A: Validation Pipeline Refactor (GritHunter branch)
+
+### 17. Perplexity demoted to discovery-only; deterministic prefilter gate added
+
+**Motivation:** The prior architecture let Perplexity act as both discoverer and judge — selecting one `selectedCandidate` winner and embedding quality gates in the prompt. Two failure modes:
+1. Perplexity hallucinated or misjudged artifact quality with no downstream safety net.
+2. The `resolveCitation` fallback accepted any raw URL that contained "http", including repo-root and profile URLs, which are not scoreable artifacts.
+
+**Changes — `src/lib/perplexity.ts`:**
+- New exported types: `ArtifactType`, `CandidateEvidenceStub`, `CandidatePool`.
+- Prompt changed from `{ selectedCandidate, alternativeCandidates }` to `{ candidates[] }` (pool of 3–8 stubs). Perplexity is now instructed to discover, not rank.
+- New exported `parseCandidatePool()`. `resolveCitationStrict()` replaces the permissive fallback — citations must resolve to a `pull` or `commit` URL via `parseGitHubUrl` or they produce `null`. No raw-URL fallback.
+- `parseStatus` field distinguishes `'parse_error'` (JSON failed to extract) from `'zero_valid'` (JSON parsed but all citations resolved to null) from `'ok'` (≥1 valid URL). Both failure modes log a distinct console message before returning.
+- `dispatchPerplexityAgent` return type is **unchanged** in Phase A — it maps the pool back to `{ selectedVendor, alternativeVendors }` internally so `dispatch/route.ts` required zero edits.
+
+**Changes — `src/lib/github.ts`:**
+- Four named threshold constants: `SIGNAL_MIN_TOTAL_LINES = 30`, `SIGNAL_MIN_LOGIC_LINES = 20`, `SIGNAL_MULTI_SUBSYSTEM_FILE_COUNT = 3`, `SIGNAL_HIGH_DENSITY_LINES = 50`.
+- New types: `PRMetadata`, `PRFile`, `CommitMetadata`, `ArtifactSignalReport`.
+- New async fetchers: `getPullRequestMetadata`, `listPullRequestFiles`, `getCommitMetadata` — all use shared `githubJsonHeaders()`.
+- New pure function `assessArtifactSignal()` — 6 ordered rejection gates (`trivial_scope`, `only_boilerplate`, `dep_bump_or_chore`, `docs_config_test_only`, `insufficient_logic_density`, `unmerged_draft`) and 3 positive signals (`multi_subsystem_scope`, `high_logic_density`, `concurrency_state_hint`). No LLM judgment.
+
+**Changes — `src/app/api/bounty/[id]/diligence/route.ts`:**
+- New step 5 (prefilter) inserted between diff fetch and scorer call.
+- `repo` and `unknown` URL kinds return 400 immediately — repo-root URLs are no longer silently resolved to latest commit.
+- For valid PR/commit URLs: fetches metadata, runs `assessArtifactSignal`. Rejection logs `rejections[]` into `agent_logs` and returns 400 with the reason — no Claude call is made.
+- Pass logs `signals[]` before proceeding to scorer.
+- Metadata fetch failure is non-fatal (e.g., private repos) — gate is skipped and scoring continues.
+- No schema changes. All existing `engineer_reports` fields are unchanged.
+
+**Calibration preserved:** Phase A was surgically additive on `github.ts` (no existing function touched). Perplexity prompt change is backward-compat at the API boundary — `dispatch/route.ts` still receives the old vendor shape.
+
+---
+
+## [2026-04-20] Phase B: Pool Persistence & Full Dispatch Refactor (GritHunter branch)
+
+### 18. dispatch/route.ts now persists the full candidate pool with per-artifact validation
+
+**Motivation:** Phase A left `dispatch/route.ts` untouched — it still received the legacy `{ selectedVendor, alternativeVendors }` shape from the internal shim. Phase B removes that indirection and wires the route directly to the pool.
+
+**Changes — `src/lib/perplexity.ts`:**
+- Extracted private `callPerplexityApi(task)` helper — one place for the HTTP fetch/decode, shared by both exports.
+- New exported `dispatchPerplexityPool(task): Promise<CandidatePool>` — canonical Phase B entry point. Logging of `parse_error` / `zero_valid` / `ok` lives here.
+- `dispatchPerplexityAgent` demoted to a `@deprecated` wrapper over the same transport + legacy vendor-shape mapper. Kept so any callers outside the dispatch route continue to compile.
+
+**Changes — `src/app/api/bounty/[id]/dispatch/route.ts`:**
+- Imports `dispatchPerplexityPool` and the full signal-filter set from `github.ts`.
+- `parse_error` → 502, `zero_valid` → 422, both with distinct `agent_logs` entries.
+- For each valid stub: fetches PR or commit metadata from GitHub, runs `assessArtifactSignal`. Metadata fetch failure is non-fatal — stub stored as `validation_status: 'pending'`.
+- All stubs inserted in a single batch `vendors` insert. First validated stub gets `is_primary: true`; if none pass, first pending stub is promoted as fallback.
+- `agent_logs` has per-stub pass/fail entries (with signals or rejection reason) in addition to the pool-level status entry — full audit trail.
+- Response shape backward-compatible: `vendor` key is still the primary row. Added `candidatePool: { total, validated, rejected }` field for observability.
+
+**Changes — `supabase/schema.sql`:**
+- Four new columns on `vendors`: `validation_status TEXT DEFAULT 'pending'`, `artifact_type TEXT`, `citation_id INTEGER`, `rejection_reason TEXT`.
+- Migration `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements included as comments.
+
 ### 13. Open Infra Debt (carry forward)
 - **Forensic Code Library (pgvector):** Still empty. Diligence currently scores in isolation. Next unlock is similarity search against ~50 seeded Gold Standard PRs.
 - **Settlement UI:** `EscrowButton.tsx` intentionally parked — OnchainKit v1.x has breaking API changes with wagmi v2 (`calls` shape, `ConnectWallet` props). Re-enable once V2 Dashboard is fully built.
