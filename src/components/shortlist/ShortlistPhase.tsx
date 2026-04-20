@@ -46,19 +46,11 @@ function computeHuntScore(report: ReportRow | null): HuntScore {
 }
 
 function assignBuckets(candidates: ShortlistCandidate[]): ShortlistCandidate[] {
-  let archetypeAssigned = false;
-  let solidFitCount = 0;
-  return candidates.map((c) => {
-    const gs = c.gritScore ?? 0;
-    const overall = c.huntScore.overall;
-    if (!archetypeAssigned && gs >= 8) {
-      archetypeAssigned = true;
-      return { ...c, bucket: 'Archetype' as ShortlistBucket };
-    }
-    if (solidFitCount < 2 && overall >= 6.5) {
-      solidFitCount++;
-      return { ...c, bucket: 'Solid Fit' as ShortlistBucket };
-    }
+  // candidates are pre-sorted by overall score descending
+  // top = Archetype, next (up to index 2 or overall ≥ 6.5) = Solid Fit, rest = Alternative
+  return candidates.map((c, i) => {
+    if (i === 0) return { ...c, bucket: 'Archetype' as ShortlistBucket };
+    if (i < 3 || c.huntScore.overall >= 6.5) return { ...c, bucket: 'Solid Fit' as ShortlistBucket };
     return { ...c, bucket: 'Alternative' as ShortlistBucket };
   });
 }
@@ -229,7 +221,7 @@ export function ShortlistPhase({ bountyId }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="font-['Space_Grotesk'] font-black text-[#e1e2eb] text-lg uppercase tracking-tight">CANDIDATE SHORTLIST</h2>
+          <h2 className="font-['Space_Grotesk'] font-black text-[#e1e2eb] text-lg uppercase tracking-tight">HUNT_RESULTS</h2>
           <div className="font-mono text-[9px] text-[#84967e] mt-0.5">{candidates.length} CANDIDATE{candidates.length !== 1 ? 'S' : ''} · {candidates.filter(c => c.validationStatus === 'validated').length} VALIDATED</div>
         </div>
         <button

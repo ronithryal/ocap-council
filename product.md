@@ -327,3 +327,21 @@ Three changes make the diligence page actionable for hiring decisions:
 - ARCHITECT and HUNTING removed from sidebar nav. `/hunting` route still exists as a standalone console (bookmarkable for ops monitoring) but is no longer in the primary navigation flow.
 - SEARCH replaces both with a single entry point at `/`.
 - AUDIT and DILIGENCE remain unchanged as secondary views.
+
+---
+
+## Phase C Status — [2026-04-20] Build Verified
+
+All Phase C UI changes are implemented and passing `npm run build`:
+
+| Route | Status |
+|---|---|
+| `/` (Search) | ✅ 4-phase tab nav, hunt logs, shortlist |
+| `/audit` | ✅ `?url=` + `?reportId=` query params |
+| `/diligence` | ✅ Unchanged (Suspense + `force-dynamic` added) |
+| `/hunting` | ✅ Preserved, not in primary nav |
+
+**What's live on GritHunter branch:**
+- Phase A: Deterministic artifact signal filter, strict citation validation
+- Phase B: `dispatchPerplexityPool`, full vendor pool persistence, parse error taxonomy
+- Phase C: SEARCH nav consolidation, 4-phase SearchPhaseNav, ShortlistPhase + ShortlistCard, Hunt log viewer + NodeMap embedded in main page, Audit `?url=` deep-linking

@@ -1,44 +1,40 @@
 'use client';
 
 import { SearchPhase } from '@/types';
-import { cn } from '@/lib/utils';
 
 const PHASES: { id: SearchPhase; label: string; num: string }[] = [
-  { id: 'brief', label: 'BRIEF', num: '01' },
+  { id: 'brief',          label: 'BRIEF',        num: '01' },
   { id: 'capability-map', label: 'CAPABILITY MAP', num: '02' },
-  { id: 'hunt', label: 'HUNT', num: '03' },
-  { id: 'shortlist', label: 'SHORTLIST', num: '04' },
+  { id: 'hunt',           label: 'HUNT',         num: '03' },
+  { id: 'shortlist',      label: 'SHORTLIST',    num: '04' },
 ];
 
 interface Props {
   phase: SearchPhase;
-  onSelect: (p: SearchPhase) => void;
 }
 
-export function SearchPhaseNav({ phase, onSelect }: Props) {
+export function SearchPhaseNav({ phase }: Props) {
   return (
-    <div className="fixed top-11 left-[240px] right-0 h-9 bg-[#0b0e14] border-b border-[#1a1f26]/60 flex items-stretch px-2 z-40">
-      {PHASES.map((p) => {
+    <div className="fixed top-11 left-[240px] right-0 h-8 bg-[#0b0e14] border-b border-[#1a1f26]/60 flex items-center px-5 gap-0 z-40">
+      {PHASES.map((p, i) => {
         const isActive = phase === p.id;
+        const isPast = PHASES.findIndex(x => x.id === phase) > i;
         return (
-          <button
-            key={p.id}
-            onClick={() => onSelect(p.id)}
-            className={cn(
-              'flex items-center gap-2 px-4 h-full transition-colors relative',
-              isActive
-                ? 'text-[#00ff41] border-b-2 border-[#00ff41]'
-                : 'text-[#84967e] hover:text-[#b9ccb2]'
+          <div key={p.id} className="flex items-center">
+            <div className="flex items-center gap-1.5">
+              <span className={`font-mono text-[8px] ${isActive ? 'text-[#00ff41]' : isPast ? 'text-[#3b4b37]' : 'text-[#1a1f26]'}`}>
+                {p.num}
+              </span>
+              <span className={`font-['Space_Grotesk'] text-[9px] uppercase tracking-widest transition-colors ${
+                isActive ? 'text-[#00ff41] font-bold' : isPast ? 'text-[#3b4b37]' : 'text-[#1a1f26]'
+              }`}>
+                {p.label}
+              </span>
+            </div>
+            {i < PHASES.length - 1 && (
+              <span className={`mx-3 font-mono text-[9px] ${isPast ? 'text-[#3b4b37]' : 'text-[#1a1f26]'}`}>—</span>
             )}
-          >
-            <span className="font-mono text-[9px] text-[#3b4b37]">{p.num}</span>
-            <span className={cn(
-              "font-['Space_Grotesk'] text-[10px] uppercase tracking-widest",
-              isActive ? 'font-bold' : 'font-medium'
-            )}>
-              {p.label}
-            </span>
-          </button>
+          </div>
         );
       })}
     </div>

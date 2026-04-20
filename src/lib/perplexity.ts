@@ -104,6 +104,7 @@ artifact_type: "pull_request" when artifact_url contains /pull/, "commit" when i
 - Do NOT hallucinate URLs — only output URLs you actually visited during your search.
 - Return raw JSON only. No markdown, no conversational text.
 - Do NOT rank or filter to a single winner — return the full discovery pool.
+- developer_handle MUST be an individual GitHub user account (a human engineer), NOT an organization or company account. Reject handles like "google", "hashicorp", "microsoft", "signal-ai", "digirati-co-uk", or any handle that belongs to a company/org repo. Target the PR author or commit author's personal username only.
 
 ## CONTEXT
 This output feeds OCAP's validation and forensic scoring pipeline. Only artifacts that pass GitHub metadata checks and deterministic signal filters will reach the scorer.

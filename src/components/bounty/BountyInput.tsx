@@ -39,6 +39,12 @@ export function BountyInput({ onDispatch, isLoading, onDescriptionChange }: Boun
       transition={{ duration: 0.5 }}
     >
       <Card className="bg-[#191c22] border-[#3b4b37]/20 p-8 max-w-3xl mx-auto overflow-hidden relative" style={{ borderRadius: '0px' }}>
+        {/* Scan-line loader — active when system is processing */}
+        {isLoading && (
+          <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-10">
+            <div className="h-full bg-[#00ff41] animate-[scanline_1.2s_linear_infinite]" style={{ width: '40%', boxShadow: '0 0 8px #00ff41' }} />
+          </div>
+        )}
         {/* Badge - Model Indicator */}
         <div className="absolute top-0 right-0 p-4">
           <Badge variant="outline" className="text-[10px] border-[#00ff41]/30 text-[#00ff41] bg-[#00ff41]/10 font-mono uppercase tracking-widest">
@@ -61,7 +67,7 @@ export function BountyInput({ onDispatch, isLoading, onDescriptionChange }: Boun
         <div className="space-y-4">
           <div className="relative group">
             <Textarea
-              placeholder="e.g., I need a high-end videographer in SF for a 2-day shoot. Must have at least 5 years experience and provide a portfolio link. Budget is strict."
+              placeholder="Describe the role you are hiring for or paste in a GitHub profile and we can get started!"
               className="min-h-[120px] bg-[#0b0e14] border-[#3b4b37]/20 focus:border-[#00ff41]/50 transition-all resize-none font-mono text-sm placeholder-[#84967e]/50"
               value={description}
               onChange={(e) => { setDescription(e.target.value); onDescriptionChange?.(e.target.value); }}

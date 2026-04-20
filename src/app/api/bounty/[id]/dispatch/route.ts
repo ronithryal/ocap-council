@@ -146,6 +146,7 @@ export async function POST(
     for (const stub of validStubs) {
       const parsedUrl = parseGitHubUrl(stub.artifact_url!);
       let signalReport: ArtifactSignalReport | null = null;
+      let metaRejectionReason: string | null = null;
 
       try {
         if (parsedUrl.kind === 'pull') {
@@ -169,16 +170,18 @@ export async function POST(
           });
         }
       } catch (metaErr: any) {
+        const is404 = metaErr.message?.includes('(404)') || metaErr.message?.toLowerCase().includes('not found');
+        if (is404) metaRejectionReason = 'ARTIFACT_404';
         await supabase.from('agent_logs').insert([{
           bounty_id: id,
           phase: 'vetting',
-          message: `Signal filter: metadata fetch failed for ${stub.artifact_url} — ${metaErr.message}. Storing as pending.`,
+          message: `Signal filter: metadata fetch ${is404 ? '404 — URL not found' : 'failed'} for ${stub.artifact_url} — ${metaErr.message}.`,
         }]);
       }
 
-      const validationStatus = signalReport
+      const validationStatus: 'validated' | 'rejected' | 'pending' = signalReport
         ? (signalReport.pass ? 'validated' : 'rejected')
-        : 'pending';
+        : metaRejectionReason ? 'rejected' : 'pending';
 
       const isPrimary = validationStatus === 'validated' && !primaryAssigned;
       if (isPrimary) primaryAssigned = true;
@@ -204,7 +207,7 @@ export async function POST(
         validation_status: validationStatus,
         artifact_type: stub.artifact_type,
         citation_id: stub.citation_id,
-        rejection_reason: signalReport && !signalReport.pass ? signalReport.reason : null,
+        rejection_reason: signalReport && !signalReport.pass ? signalReport.reason : metaRejectionReason,
       });
     }
 

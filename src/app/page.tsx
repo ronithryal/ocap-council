@@ -1,14 +1,13 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createBrowserClient } from '@supabase/ssr';
 import { BountyInput } from '@/components/bounty/BountyInput';
 import { HydrationChat } from '@/components/bounty/HydrationChat';
 import { AgentTracker } from '@/components/tracker/AgentTracker';
-import { QuoteCard } from '@/components/settlement/QuoteCard';
-import { CandidateGrid, AlternativeCandidate } from '@/components/settlement/CandidateGrid';
-import { ForensicDashboard } from '@/components/forensic/ForensicDashboard';
 import { SearchPhaseNav } from '@/components/search/SearchPhaseNav';
 import { ShortlistPhase } from '@/components/shortlist/ShortlistPhase';
 import { Button } from '@/components/ui/button';
@@ -160,12 +159,10 @@ export default function Home() {
   const [huntAutoScroll, setHuntAutoScroll] = useState(true);
   const huntLogEndRef = useRef<HTMLDivElement>(null);
   const [vendor, setVendor] = useState<Vendor | null>(null);
-  const [alternatives, setAlternatives] = useState<AlternativeCandidate[]>([]);
+  const [alternatives, setAlternatives] = useState<{ id: string; name: string; credentials: string; githubUrl?: string; summary: string; quoteAmount: number }[]>([]);
   const [bountyId, setBountyId] = useState<string | null>(null);
   const [forensicReport, setForensicReport] = useState<ForensicScore | null>(null);
-  const [isForensicLoading, setIsForensicLoading] = useState(false);
-  const [isSettled, setIsSettled] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rawAgentOutput, setRawAgentOutput] = useState<string | null>(null);
   const [rawOutputExpanded, setRawOutputExpanded] = useState(false);
@@ -200,7 +197,7 @@ export default function Home() {
         }
         setSessionsLoading(false);
       });
-  }, [isSettled, bountyId]);
+  }, [bountyId]);
 
   // Auto-advance search phase based on agent phase
   useEffect(() => {
@@ -315,48 +312,12 @@ export default function Home() {
     setPhase('hydrating');
   };
 
-  const runForensicAnalysis = async (overrideVendor?: Vendor) => {
-    const targetVendor = overrideVendor || vendor;
-    if (!targetVendor || !bountyId) return;
-    if (overrideVendor) setVendor(overrideVendor);
-    setIsForensicLoading(true);
-    setPhase('vetting');
-    try {
-      const res = await fetch(`/api/bounty/${bountyId}/diligence`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId: targetVendor.id }),
-      });
-      if (!res.ok) throw new Error('Forensic analysis failed');
-      const data = await res.json();
-      setForensicReport(data.score);
-      setLogs(prev => [...prev, { message: `Forensic Analysis complete. Grit Score: ${data.score.gritScore}/10. Call: ${data.score.recommendation}` }]);
-      setPhase('quote_received');
-    } catch (err: any) {
-      setError(err.message);
-      setLogs(prev => [...prev, { message: `Forensic Analysis failed: ${err.message}` }]);
-      setPhase('quote_received');
-    } finally {
-      setIsForensicLoading(false);
-    }
-  };
-
-  const handleSelectAlternative = (candidate: AlternativeCandidate) => {
-    const altAsVendor: Vendor = {
-      id: candidate.id, bountyId: bountyId || '', name: candidate.name,
-      credentials: candidate.credentials, quoteAmount: candidate.quoteAmount || 0,
-      githubUrl: candidate.githubUrl ?? undefined, summary: candidate.summary, isVerified: false,
-    };
-    setForensicReport(null);
-    runForensicAnalysis(altAsVendor);
-  };
-
   const handleDispatch = async (finalPrompt: string) => {
     setPhase('dispatching');
     setVendor(null);
     setAlternatives([]);
     setForensicReport(null);
-    setIsSettled(false);
+
     setError(null);
     setRawAgentOutput(null);
     setIsLoading(true);
@@ -414,7 +375,7 @@ export default function Home() {
     setVendor(null);
     setAlternatives([]);
     setForensicReport(null);
-    setIsSettled(false);
+
     setLogs([]);
     setHuntLogs([]);
     setBountyId(null);
@@ -569,14 +530,8 @@ export default function Home() {
     <div className="min-h-screen bg-[#0b0e14]">
       {/* Top Bar */}
       <header className="fixed top-0 left-[240px] right-0 h-11 bg-[#0b0e14]/95 backdrop-blur-md border-b border-[#1a1f26]/60 flex items-center justify-between px-6 z-50">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span className="font-['Space_Grotesk'] font-bold text-[#00ff41] text-sm">CONSOLE_ALPHA</span>
-          <span className="text-[#3b4b37] font-mono text-[10px]">|</span>
-          {['Hydration', 'Interrogation', 'Extraction'].map((tab, i) => (
-            <button key={tab} className={`font-['Space_Grotesk'] text-[11px] uppercase tracking-widest px-1 pb-0.5 transition-colors ${
-              i === 0 ? 'text-[#00ff41] border-b border-[#00ff41]' : 'text-[#84967e] hover:text-[#b9ccb2]'
-            }`}>{tab}</button>
-          ))}
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -587,11 +542,11 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Search Phase Nav */}
-      <SearchPhaseNav phase={searchPhase} onSelect={setSearchPhase} />
+      {/* Pipeline status indicator — read-only, not navigable */}
+      <SearchPhaseNav phase={searchPhase} />
 
-      {/* 3-column layout — shifted down for both header bars */}
-      <div className="ml-[240px] pt-20 flex h-[calc(100vh-80px)]">
+      {/* 3-column layout */}
+      <div className="ml-[240px] pt-[76px] flex h-[calc(100vh-76px)]">
 
         {/* Col 1: Session Map */}
         <div className="w-[260px] flex-shrink-0 border-r border-[#1a1f26]/60 flex flex-col bg-[#0b0e14]">
@@ -634,7 +589,7 @@ export default function Home() {
           {/* Context depth */}
           <div className="px-4 py-3 border-t border-[#1a1f26]/40">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-mono text-[9px] text-[#84967e] uppercase">CONTEXT DEPTH</span>
+              <span className="font-mono text-[9px] text-[#84967e] uppercase">BRIEF_CONFIDENCE</span>
               <span className="font-mono text-[9px] text-[#00ff41]">{contextDepth}%</span>
             </div>
             <div className="h-1 bg-[#1a1f26]">
@@ -756,63 +711,43 @@ export default function Home() {
               </div>
               <div className="px-5 py-4 flex-1 overflow-y-auto">
                 <div className="font-['Space_Grotesk'] text-[9px] uppercase tracking-widest text-[#84967e] mb-3">EXTRACTED PARAMETERS</div>
-                {vendor ? (
-                  <div className="space-y-2">
-                    <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                      <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">CANDIDATE</div>
-                      <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">{vendor.name}</div>
-                    </div>
-                    {vendor.credentials && (
+                <div className="space-y-2">
+                  {draftPrompt ? (
+                    <>
                       <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">ARCHETYPE</div>
-                        <div className="font-['Space_Grotesk'] font-bold text-[#feb700] text-[11px]">{vendor.credentials}</div>
-                      </div>
-                    )}
-                    {vendor.githubUrl && (
-                      <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">SMOKING GUN</div>
-                        <a href={vendor.githubUrl} target="_blank" rel="noopener noreferrer"
-                          className="font-mono text-[9px] text-[#00ff41] truncate block hover:underline">{vendor.githubUrl}</a>
-                      </div>
-                    )}
-                    {alternatives.length > 0 && (
-                      <div className="bg-[#10131a] border border-[#feb700]/20 p-3">
-                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">ALTERNATIVES</div>
-                        <div className="font-['Space_Grotesk'] font-bold text-[#feb700] text-[11px]">{alternatives.length} candidate{alternatives.length !== 1 ? 's' : ''}</div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">WORDS</div>
-                        <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">
-                          {draftPrompt ? draftPrompt.trim().split(/\s+/).filter(Boolean).length : '—'}
+                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">ROLE</div>
+                        <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px] truncate">
+                          {draftPrompt.split(/[\n.]/)[0].trim().substring(0, 60) || '—'}
                         </div>
                       </div>
                       <div className="bg-[#10131a] border border-[#1a1f26]/60 p-3">
-                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">TECH TERMS</div>
+                        <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">STACK</div>
                         <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px]">
-                          {draftPrompt ? (draftPrompt.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|api|async|concurrent|distributed|state|machine|architecture|system|design|performance|latency|throughput|memory|race|condition|mutex|channel|interface|lifetime|generic|trait|protocol|consensus|raft|paxos|sharding|replication)\b/gi) || []).length : '—'}
+                          {(() => {
+                            const terms = (draftPrompt.match(/\b(rust|go|golang|typescript|python|kubernetes|docker|postgres|redis|kafka|grpc|aws|gcp|azure|terraform|prometheus|grafana|react|node|java|scala|c\+\+|c#|solidity|elixir|rails)\b/gi) || []);
+                            const unique = [...new Set(terms.map(t => t.toLowerCase()))].slice(0, 5);
+                            return unique.length > 0 ? unique.join(', ').toUpperCase() : '—';
+                          })()}
                         </div>
                       </div>
-                    </div>
-                    <div className={`bg-[#10131a] border p-3 transition-colors ${
-                      telemetry.finalPromptBuild >= 80 ? 'border-[#00ff41]/30' :
-                      telemetry.finalPromptBuild >= 40 ? 'border-[#feb700]/20' : 'border-[#1a1f26]/60'
+                    </>
+                  ) : (
+                    <div className="font-mono text-[9px] text-[#3b4b37]">AWAITING_INPUT</div>
+                  )}
+                  <div className={`bg-[#10131a] border p-3 transition-colors ${
+                    telemetry.finalPromptBuild >= 80 ? 'border-[#00ff41]/30' :
+                    telemetry.finalPromptBuild >= 40 ? 'border-[#feb700]/20' : 'border-[#1a1f26]/60'
+                  }`}>
+                    <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">STATUS</div>
+                    <div className={`font-['Space_Grotesk'] font-bold text-[11px] ${
+                      telemetry.finalPromptBuild >= 80 ? 'text-[#00ff41]' :
+                      telemetry.finalPromptBuild >= 40 ? 'text-[#feb700]' : 'text-[#84967e]'
                     }`}>
-                      <div className="font-mono text-[8px] text-[#84967e] uppercase mb-1">STATUS</div>
-                      <div className={`font-['Space_Grotesk'] font-bold text-[11px] ${
-                        telemetry.finalPromptBuild >= 80 ? 'text-[#00ff41]' :
-                        telemetry.finalPromptBuild >= 40 ? 'text-[#feb700]' : 'text-[#84967e]'
-                      }`}>
-                        {telemetry.finalPromptBuild >= 80 ? 'READY_TO_DISPATCH' :
-                         telemetry.finalPromptBuild >= 40 ? 'NEEDS_REFINEMENT' : 'AWAITING_INPUT'}
-                      </div>
+                      {telemetry.finalPromptBuild >= 80 ? 'READY_TO_DISPATCH' :
+                       telemetry.finalPromptBuild >= 40 ? 'NEEDS_REFINEMENT' : 'AWAITING_INPUT'}
                     </div>
                   </div>
-                )}
+                </div>
               </div>
               {phase !== 'idle' && (
                 <div className="px-5 py-4 border-t border-[#1a1f26]/40">
@@ -840,23 +775,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Settlement success toast */}
-      {isSettled && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-8 right-8 bg-[#191c22] p-5 border border-[#00ff41]/40 shadow-[0_0_40px_rgba(0,255,65,0.2)] z-[100] max-w-xs"
-          style={{ borderRadius: '0px' }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-2 w-2 bg-[#00ff41] animate-pulse" />
-            <span className="font-['Space_Grotesk'] font-bold text-[#00ff41] text-[11px] uppercase tracking-widest">Candidate Selected</span>
-          </div>
-          <p className="font-mono text-[9px] text-[#84967e] mb-3">Candidate hired. Team notified for onboarding.</p>
-          <button onClick={resetAll}
-            className="w-full py-2 bg-[#1d2026] hover:bg-[#272a31] border border-[#3b4b37] font-['Space_Grotesk'] font-bold text-[10px] uppercase text-[#e1e2eb] transition-colors"
-            style={{ borderRadius: '0px' }}>
-            DISPATCH NEW AGENT
-          </button>
-        </motion.div>
-      )}
     </div>
   );
 }

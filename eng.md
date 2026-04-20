@@ -320,3 +320,8 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 - `SearchPhase`, `ShortlistBucket`, `DiligenceRecommendation`, `CandidateEvidence`, `HuntScore`, `ShortlistCandidate` all added.
 
 **TypeScript:** `tsc --noEmit` exits clean, zero errors.
+
+**Build fix — `export const dynamic = 'force-dynamic'`:**
+- Added to `src/app/page.tsx`, `src/app/audit/page.tsx`, `src/app/diligence/page.tsx`.
+- Root cause: `createBrowserClient` in `@supabase/ssr` throws during Next.js static prerender if `NEXT_PUBLIC_SUPABASE_URL` is absent from the build environment. `force-dynamic` opts these pages out of static generation.
+- `npm run build` exits clean with all 12 routes prerendered/compiled correctly after copying `.env` to worktree `.env.local`.
