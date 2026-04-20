@@ -33,7 +33,7 @@ export interface CandidatePool {
   rawAgentOutput: string;
 }
 
-const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
+const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/agent';
 
 /**
  * Hydrate a raw user prompt into a structured Brockman Formula prompt.
@@ -341,45 +341,44 @@ async function callPerplexityApi(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'sonar-pro',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are the autonomous OCAP Council Discovery Agent. Follow the GOAL, DISCOVERY GUIDANCE, RETURN FORMAT, and WARNINGS exactly. Output valid, parseable JSON and nothing else.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      max_tokens: 4000,
-      temperature: 0.2,
+      preset: 'pro-search',
+      input: prompt,
+      instructions:
+        'You are the autonomous OCAP Council Discovery Agent. Follow the GOAL, DISCOVERY GUIDANCE, RETURN FORMAT, and WARNINGS exactly. Output valid, parseable JSON and nothing else.',
+      return_citations: true,
     }),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error('Perplexity API error:', response.status, errorBody);
+    console.error('Perplexity Agent API error:', response.status, errorBody);
     throw new Error(`Perplexity Agent API returned ${response.status}: ${errorBody}`);
   }
 
   const data = await response.json();
 
-  // chat/completions response shape
-  const content: string | undefined = data.choices?.[0]?.message?.content;
+  // Agent API response shape:
+  //   data.output_text  — aggregated string (preferred)
+  //   data.output[]     — array of {type:'message', content: string}
+  const content: string =
+    data.output_text ||
+    data.output?.find((o: any) => o.type === 'message')?.content ||
+    '';
 
   if (!content) {
-    console.error('[Perplexity] unexpected response shape:', JSON.stringify(data).slice(0, 500));
-    throw new Error('Empty or unexpected response from Perplexity API');
+    console.error('[Perplexity] unexpected Agent API response:', JSON.stringify(data).slice(0, 500));
+    throw new Error('Empty or unexpected response from Perplexity Agent API');
   }
 
-  // sonar-pro returns citations as a top-level string[] — map to {id, url} so
-  // resolveCitationStrict can look them up by 1-based citation number [1], [2], etc.
-  const rawCitations: string[] = Array.isArray(data.citations) ? data.citations : [];
-  const searchResults = rawCitations.map((url: string, i: number) => ({ id: i + 1, url }));
+  // Citations are [{url, title}] objects — normalise to {id, url} for resolveCitationStrict
+  // (which resolves [1], [2] references by 1-based position)
+  const rawCitations: any[] = Array.isArray(data.citations) ? data.citations : [];
+  const searchResults = rawCitations.map((c: any, i: number) => ({
+    id: i + 1,
+    url: typeof c === 'string' ? c : (c.url ?? ''),
+  }));
 
-  console.info(`[Perplexity] ok — ${rawCitations.length} citations returned`);
+  console.info(`[Perplexity] Agent API ok — ${rawCitations.length} citations, content length ${content.length}`);
 
   return { content, searchResults };
 }
