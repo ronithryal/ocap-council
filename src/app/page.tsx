@@ -662,37 +662,6 @@ export default function Home() {
                 {phase !== 'idle' && phase !== 'hydrating' && (
                   <motion.div key="tracker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                     <AgentTracker currentPhase={phase} logs={logs} bountyId={bountyId ?? undefined} />
-                    {forensicReport && (
-                      <ForensicDashboard
-                        report={forensicReport} developerHandle={vendor?.name || 'Unknown'}
-                        smokingGunUrl={vendor?.githubUrl || ''}
-                        onHireForTrial={() => setIsSettled(true)} onDoNotHire={resetAll}
-                      />
-                    )}
-                    {vendor && !forensicReport && (
-                      <div className="space-y-4">
-                        <QuoteCard vendor={vendor} onSettled={() => setIsSettled(true)} />
-                        {alternatives.length > 0 && (
-                          <CandidateGrid candidates={alternatives} onSelect={handleSelectAlternative} />
-                        )}
-                        <div className="bg-[#191c22] border border-[#00ff41]/20 p-5 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-[#00ff41]/10 border border-[#00ff41]/20 flex items-center justify-center">
-                              <span className="material-symbols-outlined text-[#00ff41] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>biotech</span>
-                            </div>
-                            <div>
-                              <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px] uppercase">Run Forensic Analysis</div>
-                              <div className="font-mono text-[9px] text-[#84967e]">Pull raw diff · evaluate Grit vs AI-Slop</div>
-                            </div>
-                          </div>
-                          <Button onClick={() => runForensicAnalysis()} disabled={isForensicLoading}
-                            className="bg-[#00ff41] hover:bg-[#72ff70] text-[#003907] font-['Space_Grotesk'] font-bold h-10 px-5 shadow-[0_0_16px_rgba(0,255,65,0.25)] transition-all"
-                            style={{ borderRadius: '0px' }}>
-                            {isForensicLoading ? 'ANALYZING...' : 'ANALYZE GRIT'}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                     {phase === 'failed' && (
                       <div className="border border-[#ffb4ab]/20 bg-[#93000a]/5 p-8">
                         <div className="font-['Space_Grotesk'] font-bold text-[#ffb4ab] mb-2">AGENT DISPATCH FAILED</div>
