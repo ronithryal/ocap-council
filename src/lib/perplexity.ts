@@ -65,8 +65,19 @@ Prioritize artifacts that exhibit these complexity markers:
 
 Avoid surfacing: typo fixes, README/doc-only changes, formatting commits, dependency bumps, bot-authored PRs, single-line changes. We would rather have a smaller pool of genuine candidates than a large pool of noise.
 
+## SEARCH STRATEGY
+You MUST search for and cite individual PR pages and commit pages — NOT repo homepages or user profiles. Your citations must contain "/pull/" or "/commit/" in the URL path.
+
+Use targeted search queries such as:
+- "site:github.com/*/pull rust lifetime ownership 2023"
+- "github.com pull request concurrent mutex goroutine merged"
+- "github.com/[username]/[repo]/pull/ state machine refactor"
+
+If a search result URL is a repo homepage (e.g., github.com/owner/repo with nothing after the repo name), do NOT cite it — search more specifically for that repo's PRs instead.
+
 ## RETURN FORMAT
-Return a strict JSON object with this exact structure. Do NOT wrap in Markdown. Do NOT write raw URLs — use citation IDs only (e.g., "[1]").
+Return a strict JSON object with this exact structure. Do NOT wrap in Markdown.
+For artifact_url: use a citation ID like "[1]" if you have a search result citing a PR or commit page. If you have the direct URL to a specific PR or commit, you may include it as a raw URL string. NEVER use a repo homepage or profile URL.
 
 {
   "candidates": [
@@ -81,11 +92,12 @@ Return a strict JSON object with this exact structure. Do NOT wrap in Markdown. 
   "searchSummary": "Brief description of the behavioral keywords and search strategies used."
 }
 
-Rules for artifact_type: use "pull_request" for PR links, "commit" for commit links. Never use a repo root URL or a user profile URL as artifact_url — those are not valid evidence artifacts.
+Rules for artifact_type: use "pull_request" for PR links (URL contains /pull/), "commit" for commit links (URL contains /commit/). Never use a repo root URL or a user profile URL as artifact_url — those are not valid evidence artifacts.
 
 ## WARNINGS
 - Do NOT hallucinate GitHub URLs or developer names.
-- artifact_url MUST be a citation ID like "[1]" pointing to a specific PR or commit, not a profile or repo root.
+- artifact_url MUST point to a specific PR or commit — not a profile or repo root.
+- Citations that resolve to repo homepages are USELESS — the downstream pipeline will reject them.
 - Return raw JSON only. No conversational text.
 - Do NOT rank or filter to a single winner — return the full discovery pool.
 
@@ -113,11 +125,27 @@ function resolveCitationStrict(
 ): { url: string | null; citationId: number | null } {
   if (!val) return { url: null, citationId: null };
 
+  // Accept raw GitHub PR/commit URLs the model may include directly
+  if (val.includes('github.com') && (val.includes('/pull/') || val.includes('/commit/'))) {
+    const parsed = parseGitHubUrl(val.trim());
+    if (parsed.kind === 'pull' || parsed.kind === 'commit') {
+      return { url: val.trim(), citationId: null };
+    }
+  }
+
   const match = val.match(/\[(\d+)\]/);
   if (!match) return { url: null, citationId: null };
 
   const id = parseInt(match[1], 10);
-  const source = searchResults.find((s) => s.id === id);
+
+  // Try id-field match (int or string), then 1-indexed position, then 0-indexed position
+  const source =
+    searchResults.find((s) => s.id === id) ||
+    searchResults.find((s) => s.id === String(id)) ||
+    searchResults[id - 1] ||
+    searchResults[id] ||
+    null;
+
   if (!source?.url) return { url: null, citationId: id };
 
   const parsed = parseGitHubUrl(source.url);
