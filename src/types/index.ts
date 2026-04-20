@@ -148,3 +148,59 @@ export interface PerplexityWebhookResponse {
   };
   error?: string;
 }
+
+// ─── Search / Shortlist / Diligence Types ────────────────────────────────────
+
+/** The 4 phases of the unified Search workflow. */
+export type SearchPhase = 'brief' | 'capability-map' | 'hunt' | 'shortlist';
+
+/** Shortlist grouping bucket. */
+export type ShortlistBucket = 'Archetype' | 'Solid Fit' | 'Alternative';
+
+/** Candidate-level diligence recommendation labels. */
+export type DiligenceRecommendation = 'HIRE' | 'STRONG_FIT' | 'REVIEW' | 'PASS';
+
+/** A single piece of evidence (PR/commit artifact) attached to a candidate. */
+export interface CandidateEvidence {
+  id: string;
+  artifactUrl: string;
+  artifactType: 'pull_request' | 'commit';
+  repo: string;
+  summary: string;
+  validationStatus: 'validated' | 'rejected' | 'pending';
+  /** 0-10 from forensic scorer, populated after analysis. */
+  artifactQuality?: number;
+  signals: string[];
+  rejectionReason?: string;
+  citationId?: number | null;
+}
+
+/**
+ * Weighted composite score for a candidate.
+ * roleFit is 6.5 neutral until role-fit scoring is implemented.
+ */
+export interface HuntScore {
+  overall: number;           // weighted composite, 0-10
+  engineerQuality: number;   // technical ceiling — from grit_score when available
+  roleFit: number;           // fit for this specific brief
+  evidenceConfidence: number; // strength/consistency of evidence
+}
+
+/** A candidate entry in the shortlist, aggregating vendor + report data. */
+export interface ShortlistCandidate {
+  id: string;                // vendor row id
+  bountyId: string;
+  developerHandle: string;
+  archetype?: ForensicScore['archetype'];
+  huntScore: HuntScore;
+  bucket: ShortlistBucket;
+  evidence: CandidateEvidence[];
+  bestArtifactUrl?: string;
+  bestArtifactSummary?: string;
+  topSignal?: string;
+  topRisk?: string;
+  recommendation?: ForensicScore['recommendation'];
+  validationStatus: 'validated' | 'rejected' | 'pending';
+  gritScore?: number;
+  reportId?: string;
+}

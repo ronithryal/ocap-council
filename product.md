@@ -267,3 +267,63 @@ The Supabase table and TypeScript types now store the full `ForensicScore` shape
 - The `/audit` page is now a real audit trail, not a demo stub.
 - Every bounty run through the diligence pipeline produces a permanent, queryable record.
 - The recommendation language is now neutral and employer-friendly — no implied payment terms.
+
+---
+
+## [2026-04-20] Search-First Navigation + Shortlist Surface
+
+### The Council Metaphor Made Real
+
+The product finally delivers on the "Council" concept end-to-end. Previously, the user had to manually navigate between ARCHITECT and HUNTING while a job was running, with no surface to compare candidates after the hunt completed. Now the entire workflow lives in one place.
+
+### SEARCH: 4-Phase Pipeline in One View
+
+| Phase | Tab | What the user sees | Auto-advances when |
+|---|---|---|---|
+| **Brief** | `01 BRIEF` | Prompt hydration chat, telemetry readiness vectors | Agent is `idle` or `hydrating` |
+| **Capability Map** | `02 CAPABILITY MAP` | Dispatch in progress, AgentTracker live log | Agent transitions to `dispatching` |
+| **Hunt** | `03 HUNT` | Live interrogation log + candidate node map | Agent is `navigating / vetting / awaiting_quote` |
+| **Shortlist** | `04 SHORTLIST` | Ranked candidate cards grouped by bucket | Agent reaches `quote_received` |
+
+The user can also click any tab manually at any time — no forced flow.
+
+### Shortlist: Three Semantic Buckets
+
+The Shortlist surface replaces the flat `CandidateGrid` with a structured ranking:
+
+| Bucket | Criteria | Visual language |
+|---|---|---|
+| **ARCHETYPE** | First candidate with `gritScore ≥ 8` | Green border, green badge |
+| **SOLID FIT** | Next 1–2 candidates with `overall ≥ 6.5` | Amber border, amber badge |
+| **ALTERNATIVE** | Remaining candidates | Grey border, grey badge |
+
+Each card shows: developer handle, overall HuntScore (0–10), three sub-scores (ENG / FIT / CONF), top signal, top risk, validation status, and two action buttons — AUDIT (opens diff viewer) and DOSSIER (opens forensic report), or ANALYZE (runs diligence inline if no report exists yet).
+
+### HuntScore: Transparent Scoring Model
+
+```
+engineerQuality  = grit_score (from forensic report, else 5.0)
+roleFit          = 6.5 (neutral — role-fit scoring not yet implemented)
+evidenceConfidence = min(grit_markers.length / 5, 1) × 10
+overall          = EQ×0.5 + RF×0.3 + EC×0.2
+```
+
+The formula is intentionally readable. The `roleFit` placeholder ensures no candidate is penalised for a dimension that hasn't been scored yet.
+
+### Audit Page: Direct URL Linking
+
+The `/audit` page now accepts `?url=<encodedUrl>` as a query param. ShortlistCard's AUDIT button passes the candidate's artifact URL directly — the diff viewer opens immediately without requiring the user to find the report in the left panel. `?reportId=` pre-selects a report. Both params work independently or together.
+
+### Diligence Page: Recruiter Actions + Evidence Rail
+
+Three changes make the diligence page actionable for hiring decisions:
+
+1. **Evidence rail is now clickable** — grit marker items link to `/audit?url=<smoking_gun_url>`, letting the hiring manager jump from the evidence claim to the actual diff line.
+2. **Executive Synthesis block** — the Claude justification paragraph is surfaced in its own panel below the terminal log, not buried inside the log stream.
+3. **Recruiter Actions panel** — OPEN BEST ARTIFACT (audit link), BACK TO SHORTLIST (browser back), and a recommendation status chip (APPROVED / DO NOT PROCEED / NEEDS HUMAN REVIEW) with a material icon.
+
+### Navigation Cleanup
+
+- ARCHITECT and HUNTING removed from sidebar nav. `/hunting` route still exists as a standalone console (bookmarkable for ops monitoring) but is no longer in the primary navigation flow.
+- SEARCH replaces both with a single entry point at `/`.
+- AUDIT and DILIGENCE remain unchanged as secondary views.

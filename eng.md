@@ -252,3 +252,71 @@ The rubric is behaving exactly as designed: skeptical by default, rewards domain
 - Added `rejectedCandidates` array: Documents rejected candidates and reasons
 
 **Result:** The Sourcing Agent is now a "Pre-Vetting Orchestrator." It surfaces only candidates with significant architectural impact, ensuring the Forensic Scorer receives high-quality inputs and the CTO dashboard shows 8/10 and 9/10 candidates by default.
+
+---
+
+## [2026-04-20] UI Refactor: SEARCH Nav + Shortlist Surface (GritHunter branch)
+
+### 19. ARCHITECT + HUNTING consolidated into SEARCH with 4 sub-phases
+
+**Motivation:** The two-nav structure (ARCHITECT at `/`, HUNTING at `/hunting`) split a single workflow across two pages, forced the user to manually navigate mid-dispatch, and had no surface for post-hunt candidate ranking. The new SEARCH nav collapses the full pipeline into one page with auto-advancing phase tabs.
+
+**Changes — `src/components/layout/Sidebar.tsx`:**
+- Removed `ARCHITECT` (icon: `smart_toy`) and `HUNTING` (icon: `radar`) nav items.
+- Added single `SEARCH` item (href: `/`, icon: `manage_search`). AUDIT and DILIGENCE unchanged.
+
+**Changes — `src/components/search/SearchPhaseNav.tsx` (new):**
+- Fixed second bar at `top-11` (below main header), spanning left-[240px] to right-0, height 9.
+- Four phase tabs: `01 BRIEF` → `02 CAPABILITY MAP` → `03 HUNT` → `04 SHORTLIST`.
+- Active tab: `#00ff41` color + `border-b-2`. Manual tab switching always allowed; auto-advance is driven by `AgentPhase` in the parent.
+
+**Changes — `src/app/page.tsx`:**
+- New `searchPhase: SearchPhase` state (`'brief' | 'capability-map' | 'hunt' | 'shortlist'`).
+- New `huntLogs: AgentLog[]` state with full row shape (id, phase, message, metadata, created_at).
+- Auto-advance `useEffect` on `phase`: `idle/hydrating → brief`, `dispatching → capability-map`, `navigating/vetting/awaiting_quote → hunt`, `quote_received/completed → shortlist`.
+- Realtime Supabase subscription on `bountyId` populates `huntLogs` via `postgres_changes` INSERT on `agent_logs`. Shared by hunt log viewer and NodeMap.
+- Main content area: `pt-11 → pt-20`, `h-[calc(100vh-44px)] → h-[calc(100vh-80px)]` to account for both fixed bars.
+- Col 2 content now phase-conditional:
+  - `brief` / `capability-map`: existing BountyInput → HydrationChat → AgentTracker + ForensicDashboard flow (unchanged).
+  - `hunt`: inline live interrogation log viewer with AUTOSCROLL toggle, per-entry phase tags, stats bar.
+  - `shortlist`: `<ShortlistPhase bountyId={bountyId} />`.
+- Col 3 content now phase-conditional:
+  - `brief` / `capability-map`: existing Prompt Telemetry panel (unchanged).
+  - `hunt`: inline `NodeMap` component (bounty/candidate/repo SVG graph) + phase distribution bars.
+  - `shortlist`: pool summary panel (primary candidate, smoking gun URL, pool count, grit score if available).
+- `NodeMap` inlined in `page.tsx` as a local function — reads `huntLogs` metadata for candidate handles and repo names. SVG grid overlay + dashed lines between bounty → candidate → repo nodes.
+- `PHASE_TAG` / `getLogTag` inlined from hunting/page.tsx (hunting route preserved, just removed from nav).
+- `resetAll` extended to also clear `huntLogs`.
+
+**Changes — `src/components/shortlist/ShortlistCard.tsx` (new):**
+- Card for a `ShortlistCandidate`. Zero border-radius, forensic-console palette.
+- Header: developer handle, bucket badge (`ARCHETYPE` green / `SOLID FIT` amber / `ALTERNATIVE` grey), recommendation badge.
+- Overall score (large, color-coded ≥8 green / ≥6 amber / below grey).
+- Three `ScorePip` sub-scores: ENG (engineerQuality), FIT (roleFit), CONF (evidenceConfidence) — each with a mini progress bar.
+- Top signal (green `+`) and top risk (amber `!`) from first grit marker / red flag.
+- Validation status badge + artifact count.
+- Action buttons: AUDIT → `/audit?url=<bestArtifactUrl>`, DOSSIER → `/diligence?reportId=<reportId>`, or ANALYZE (calls `/api/bounty/[id]/diligence` inline).
+
+**Changes — `src/components/shortlist/ShortlistPhase.tsx` (new):**
+- Fetches `vendors` + `engineer_reports` for `bountyId` from Supabase on mount.
+- `computeHuntScore(report)`: with report → `engineerQuality = grit_score`, `roleFit = 6.5` (neutral placeholder), `evidenceConfidence = min(markers/5, 1)*10`, `overall = EQ*0.5 + RF*0.3 + EC*0.2`; without report → `{7.0, 5.0, 6.5, 5.0}`.
+- `assignBuckets(sorted)`: first candidate with `gritScore >= 8` → Archetype; next ≤2 with `overall >= 6.5` → Solid Fit; rest → Alternative.
+- Renders three labeled bucket sections with `ShortlistCard` grid. Refresh button re-fetches.
+- Inline ANALYZE: calls `POST /api/bounty/[id]/diligence`, then re-fetches candidates to show updated score.
+
+**Changes — `src/app/audit/page.tsx`:**
+- Wrapped in `Suspense` + extracted `AuditContent` inner component for `useSearchParams`.
+- `?url=<encodedUrl>` query param: bypasses report selection, feeds URL directly to diff fetcher. Header shows the GitHub path as target label.
+- `?reportId=<id>` query param: pre-selects the matching report from the loaded list.
+- When a report is clicked in the left panel, `activeDiffUrl` is updated to that report's `smoking_gun_url`.
+- DECODE_DIFF button is now an `<a>` tag linking to `activeDiffUrl` (opens GitHub directly).
+
+**Changes — `src/app/diligence/page.tsx`:**
+- Traceable Evidence items that are grit markers now render as `<a>` tags linking to `/audit?url=<smoking_gun_url>` — clicking a positive evidence entry opens the diff viewer on that artifact.
+- `open_in_new` icon replaces `link` icon for clickable evidence items.
+- New bottom section below terminal log: **Executive Synthesis** (justification paragraph in a styled panel) + **Recruiter Actions** (OPEN BEST ARTIFACT → `/audit?url=`, BACK TO SHORTLIST → `window.history.back()`, recommendation status chip with icon).
+
+**Types — `src/types/index.ts`** (already completed in prior session):
+- `SearchPhase`, `ShortlistBucket`, `DiligenceRecommendation`, `CandidateEvidence`, `HuntScore`, `ShortlistCandidate` all added.
+
+**TypeScript:** `tsc --noEmit` exits clean, zero errors.

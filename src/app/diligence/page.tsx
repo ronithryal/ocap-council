@@ -307,35 +307,45 @@ function DiligenceContent() {
           </div>
           {evidence.length > 0 ? (
             <div className="space-y-2">
-              {evidence.map((ev) => (
-                <div
-                  key={ev.id}
-                  className={`p-3 border transition-colors group cursor-pointer ${
-                    ev.flag === 'warn'
-                      ? 'border-[#feb700]/30 bg-[#feb700]/5'
-                      : 'border-[#1a1f26]/60 hover:border-[#00ff41]/20 hover:bg-[#00ff41]/3'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        {ev.flag === 'warn' ? (
-                          <span className="font-mono text-[8px] bg-[#feb700] text-[#0b0e14] px-1 font-bold">{ev.id}</span>
-                        ) : (
-                          <span className="font-mono text-[9px] text-[#84967e]">[{ev.id}]</span>
-                        )}
+              {evidence.map((ev) => {
+                const isGritMarker = ev.flag === null;
+                const auditUrl = isGritMarker && report?.smoking_gun_url
+                  ? `/audit?url=${encodeURIComponent(report.smoking_gun_url)}`
+                  : null;
+                const Wrapper = auditUrl ? 'a' : 'div';
+                return (
+                  <Wrapper
+                    key={ev.id}
+                    {...(auditUrl ? { href: auditUrl } : {})}
+                    className={`p-3 border transition-colors group cursor-pointer block ${
+                      ev.flag === 'warn'
+                        ? 'border-[#feb700]/30 bg-[#feb700]/5'
+                        : 'border-[#1a1f26]/60 hover:border-[#00ff41]/20 hover:bg-[#00ff41]/5'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          {ev.flag === 'warn' ? (
+                            <span className="font-mono text-[8px] bg-[#feb700] text-[#0b0e14] px-1 font-bold">{ev.id}</span>
+                          ) : (
+                            <span className="font-mono text-[9px] text-[#84967e]">[{ev.id}]</span>
+                          )}
+                        </div>
+                        <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px] truncate">{ev.title}</div>
+                        <div className={`font-mono text-[9px] mt-0.5 ${ev.flag === 'warn' ? 'text-[#feb700]' : 'text-[#84967e]'}`}>{ev.meta}</div>
                       </div>
-                      <div className="font-['Space_Grotesk'] font-bold text-[#e1e2eb] text-[11px] truncate">{ev.title}</div>
-                      <div className={`font-mono text-[9px] mt-0.5 ${ev.flag === 'warn' ? 'text-[#feb700]' : 'text-[#84967e]'}`}>{ev.meta}</div>
+                      {ev.flag === 'warn' ? (
+                        <span className="material-symbols-outlined text-[14px] text-[#feb700] flex-shrink-0">warning</span>
+                      ) : (
+                        <span className="material-symbols-outlined text-[14px] text-[#3b4b37] group-hover:text-[#00ff41] flex-shrink-0 transition-colors">
+                          {auditUrl ? 'open_in_new' : 'link'}
+                        </span>
+                      )}
                     </div>
-                    {ev.flag === 'warn' ? (
-                      <span className="material-symbols-outlined text-[14px] text-[#feb700] flex-shrink-0">warning</span>
-                    ) : (
-                      <span className="material-symbols-outlined text-[14px] text-[#3b4b37] group-hover:text-[#00ff41] flex-shrink-0 transition-colors">link</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  </Wrapper>
+                );
+              })}
             </div>
           ) : (
             <div className="font-mono text-[9px] text-[#3b4b37]">NO_EVIDENCE_DATA</div>
@@ -344,7 +354,7 @@ function DiligenceContent() {
       </div>
 
       {/* Terminal log */}
-      <div className="bg-[#0b0e14] border border-[#1a1f26]/60 p-5">
+      <div className="bg-[#0b0e14] border border-[#1a1f26]/60 p-5 mb-4">
         <div className="space-y-1 max-h-48 overflow-y-auto">
           {terminalLines.map((line, i) => (
             <div
@@ -356,6 +366,56 @@ function DiligenceContent() {
               {line}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Executive synthesis + recruiter actions */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Executive synthesis */}
+        {report.justification && (
+          <div className="bg-[#10131a] border border-[#1a1f26]/60 p-5">
+            <div className="font-['Space_Grotesk'] text-[10px] uppercase tracking-widest text-[#84967e] mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[14px]">summarize</span>
+              EXECUTIVE SYNTHESIS
+            </div>
+            <p className="font-mono text-[10px] text-[#b9ccb2] leading-relaxed">{report.justification}</p>
+          </div>
+        )}
+
+        {/* Recruiter actions */}
+        <div className="bg-[#10131a] border border-[#1a1f26]/60 p-5 flex flex-col gap-3">
+          <div className="font-['Space_Grotesk'] text-[10px] uppercase tracking-widest text-[#84967e] mb-1 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[14px]">how_to_reg</span>
+            RECRUITER ACTIONS
+          </div>
+          {report.smoking_gun_url && (
+            <a
+              href={`/audit?url=${encodeURIComponent(report.smoking_gun_url)}`}
+              className="flex items-center justify-between px-4 py-2.5 border border-[#3b4b37]/60 text-[#84967e] font-['Space_Grotesk'] font-bold text-[10px] uppercase hover:border-[#00ff41]/40 hover:text-[#00ff41] transition-colors"
+            >
+              OPEN BEST ARTIFACT
+              <span className="material-symbols-outlined text-[14px]">biotech</span>
+            </a>
+          )}
+          <button
+            onClick={() => window.history.back()}
+            className="flex items-center justify-between px-4 py-2.5 border border-[#3b4b37]/60 text-[#84967e] font-['Space_Grotesk'] font-bold text-[10px] uppercase hover:border-[#feb700]/40 hover:text-[#feb700] transition-colors"
+          >
+            BACK TO SHORTLIST
+            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+          </button>
+          <div className={`flex items-center justify-between px-4 py-2.5 border font-['Space_Grotesk'] font-bold text-[10px] uppercase ${
+            rec === 'HIRE'
+              ? 'border-[#00ff41]/40 bg-[#00ff41]/10 text-[#00ff41]'
+              : rec === 'DO_NOT_HIRE'
+              ? 'border-[#93000a]/40 bg-[#93000a]/10 text-[#ffb4ab]'
+              : 'border-[#feb700]/30 bg-[#feb700]/5 text-[#feb700]'
+          }`}>
+            {rec === 'HIRE' ? 'APPROVED FOR HIRE' : rec === 'DO_NOT_HIRE' ? 'DO NOT PROCEED' : 'NEEDS HUMAN REVIEW'}
+            <span className="material-symbols-outlined text-[14px]">
+              {rec === 'HIRE' ? 'check_circle' : rec === 'DO_NOT_HIRE' ? 'cancel' : 'pending'}
+            </span>
+          </div>
         </div>
       </div>
     </main>
