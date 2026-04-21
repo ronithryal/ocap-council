@@ -494,7 +494,7 @@ async function callPerplexityApi(
     url: r.url ?? '',
   }));
 
-  console.info(`[Perplexity] Agent API ok — ${rawCitations.length} citations, content length ${content.length}`);
+  console.info(`[Perplexity] Agent API ok — ${rawResults.length} citations, content length ${content.length}`);
 
   return { content, searchResults };
 }
