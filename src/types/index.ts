@@ -166,6 +166,7 @@ export interface ArchitectPlan {
   proofOfWorkRequirements?: ProofOfWorkRequirement[];
   disqualifiers?: DisqualifierRule[];
   goldMedalSignal?: string;
+  targetRepos?: string[];
 }
 
 export interface PerplexityTaskRequest {
