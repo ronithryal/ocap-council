@@ -473,25 +473,25 @@ async function callPerplexityApi(
 
   const data = await response.json();
 
-  // Agent API response shape:
-  //   data.output_text  — aggregated string (preferred)
-  //   data.output[]     — array of {type:'message', content: string}
+  // Agent API /v1/agent response shape per docs.perplexity.ai/api-reference/agent-post:
+  //   data.output[] — array of output items
+  //   MessageOutputItem: { type: 'message', content: [{ type: 'output_text', text: '...' }] }
+  //   SearchResultsOutputItem: { type: 'search_results', results: [{ id, url, title }] }
+
+  const messageItem = data.output?.find((o: any) => o.type === 'message');
   const content: string =
-    data.output_text ||
-    data.output?.find((o: any) => o.type === 'message')?.content ||
-    '';
+    messageItem?.content?.find((c: any) => c.type === 'output_text')?.text ?? '';
 
   if (!content) {
     console.error('[Perplexity] unexpected Agent API response:', JSON.stringify(data).slice(0, 500));
     throw new Error('Empty or unexpected response from Perplexity Agent API');
   }
 
-  // Citations are [{url, title}] objects — normalise to {id, url} for resolveCitationStrict
-  // (which resolves [1], [2] references by 1-based position)
-  const rawCitations: any[] = Array.isArray(data.citations) ? data.citations : [];
-  const searchResults = rawCitations.map((c: any, i: number) => ({
-    id: i + 1,
-    url: typeof c === 'string' ? c : (c.url ?? ''),
+  const searchResultsItem = data.output?.find((o: any) => o.type === 'search_results');
+  const rawResults: any[] = searchResultsItem?.results ?? [];
+  const searchResults = rawResults.map((r: any) => ({
+    id: r.id,
+    url: r.url ?? '',
   }));
 
   console.info(`[Perplexity] Agent API ok — ${rawCitations.length} citations, content length ${content.length}`);
