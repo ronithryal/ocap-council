@@ -140,15 +140,21 @@ function renderDisqualifiers(task: PerplexityTaskRequest): string {
 ${custom}`;
 }
 
+function renderRepoTargets(task: PerplexityTaskRequest): string {
+  const repos = task.architectPlan?.targetRepos;
+  if (!repos || repos.length === 0) return '';
+  return `\n\n## TARGET REPOSITORIES\nFocus search explicitly within these repositories only:\n${repos.map(r => `- https://github.com/${r}`).join('\n')}`;
+}
+
 function renderSearchStrategy(task: PerplexityTaskRequest): string {
-  const buckets = task.architectPlan?.capabilityBuckets;
-  if (buckets && buckets.length > 0) {
-    const allQueries = buckets.flatMap(b => b.searchQueries).map(q => `- ${q}`).join('\n');
+  const repos = task.architectPlan?.targetRepos;
+  if (repos && repos.length > 0) {
+    const queries = repos.map(r => `- "site:github.com/${r}/pull merged"\n- "site:github.com/${r}/commit"`);
     return `\n\n## SEARCH STRATEGY
 Search specifically for individual PR and commit pages — not repo homepages.
     
 Execute the following specific GitHub search queries directly:
-${allQueries}
+${queries.join('\n')}
 
 When you find a developer matching a query, navigate to their specific PR or commit page and use that URL directly.`;
   }
@@ -219,6 +225,7 @@ function hydrateBrockmanPrompt(task: PerplexityTaskRequest): string {
     renderCapabilityLanes(task),
     renderDiscoveryGuidance(task),
     renderSignalFilters(task),
+    renderRepoTargets(task),
     renderProofOfWork(task),
     renderGoldMedalSignal(task),
     renderDisqualifiers(task),
