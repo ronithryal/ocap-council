@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { dispatchPerplexityPool, buildTaskFromBounty } from '@/lib/perplexity';
+import { buildArchitectPlan } from '@/lib/architect';
 import {
   parseGitHubUrl,
   getPullRequestMetadata,
@@ -63,13 +64,24 @@ export async function POST(
     }]);
 
     // 4. Build the task and call Perplexity
-    const task = buildTaskFromBounty({
-      id,
-      description: bounty.description,
-      budget: bounty.budget,
-      title: bounty.title,
-      category: bounty.category,
-    });
+    const architectPlan = await buildArchitectPlan(bounty.description, bounty.category);
+
+    await supabase.from('agent_logs').insert([{
+      bounty_id: id,
+      phase: 'navigating',
+      message: `Architect resolved ${architectPlan.targetRepos?.length ?? 0} target repo(s): ${architectPlan.targetRepos?.join(', ') || 'none — using generic search'}`,
+    }]);
+
+    const task = buildTaskFromBounty(
+      {
+        id,
+        description: bounty.description,
+        budget: bounty.budget,
+        title: bounty.title,
+        category: bounty.category,
+      },
+      architectPlan,
+    );
 
     // 5. Transition to vetting while Perplexity runs
     await supabase
